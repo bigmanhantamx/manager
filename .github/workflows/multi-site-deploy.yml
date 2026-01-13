@@ -86,43 +86,44 @@ jobs:
           echo "🚀 Deploying ${{ matrix.siteName }} to Appwrite Hosting..."
           echo "📋 Site ID: ${{ env.APPWRITE_SITE_ID }}"
           
-          # Install Appwrite CLI for deployment
-          npm install -g appwrite-cli@latest
+          # Create a zip file of the dist directory
+          cd dist
+          zip -r ../site-build.zip . -q
+          cd ..
           
-          # Login to Appwrite
-          appwrite client --endpoint https://fra.cloud.appwrite.io/v1 --project "${{ secrets.APPWRITE_PROJECT_ID }}" --key "${{ secrets.APPWRITE_API_KEY }}"
+          echo "📦 Created deployment archive"
           
-          # Deploy to Appwrite Hosting using CLI
-          # Note: Appwrite CLI deploy hosting command format
-          appwrite deploy hosting \
-            --siteId "${{ env.APPWRITE_SITE_ID }}" \
-            --project "${{ secrets.APPWRITE_PROJECT_ID }}" \
-            --key "${{ secrets.APPWRITE_API_KEY }}" \
-            --dist "dist" \
-            --entrypoint "index.html" || {
-              echo "⚠️ CLI deployment failed, trying direct API..."
-              
-              # Fallback: Try direct API deployment
-              DEPLOY_RESPONSE=$(curl -s -X POST \
-                "https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments" \
-                -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
-                -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
-                -H "Content-Type: application/json" \
-                -F "entrypoint=index.html" \
-                -F "code=@dist" || echo '{"error":"failed"}')
-              
-              echo "API Response: $DEPLOY_RESPONSE"
-            }
-          
-          echo "✅ Deployment process completed for ${{ matrix.siteName }}"
-          
-          # Update status in database
-          curl -s -X PUT \
-            "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
+          # Deploy using Appwrite Hosting API
+          DEPLOY_RESPONSE=$(curl -s -X POST \
+            "https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments" \
             -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
             -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"status\": \"deployed\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update status"
+            -F "entrypoint=index.html" \
+            -F "code=@site-build.zip")
+          
+          echo "📤 Deployment API Response:"
+          echo "$DEPLOY_RESPONSE" | jq '.' || echo "$DEPLOY_RESPONSE"
+          
+          # Check if deployment was successful
+          DEPLOYMENT_ID=$(echo "$DEPLOY_RESPONSE" | jq -r '.["$id"] // .id // empty' || echo "")
+          
+          if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ]; then
+            echo "✅ Deployment created successfully! Deployment ID: $DEPLOYMENT_ID"
+            
+            # Update status in database
+            curl -s -X PUT \
+              "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
+              -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+              -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"status\": \"deployed\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update status"
+          else
+            echo "⚠️ Deployment may have failed. Check the response above."
+            echo "⚠️ You may need to deploy manually via Appwrite Console"
+          fi
+          
+          # Cleanup
+          rm -f site-build.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
