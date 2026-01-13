@@ -24,50 +24,81 @@ jobs:
       - name: Fetch site configurations from Appwrite
         id: set-matrix
         run: |
-          # Fetch all site configs from Appwrite database
-          CONFIGS=$(curl -s -X GET \
-            "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents" \
-            -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
-            -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
-            -H "Content-Type: application/json")
+          # Check if this is a single-site deployment request
+          SPECIFIC_SITE_ID="${{ github.event.client_payload.site_id || inputs.site_id || '' }}"
           
-          echo "Raw API Response:"
-          echo "$CONFIGS"
-          
-          # Check if response is valid JSON and has documents
-          if ! echo "$CONFIGS" | jq empty 2>/dev/null; then
-            echo "❌ Invalid JSON response from API"
-            echo "Response: $CONFIGS"
-            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
-            exit 0
+          if [ -n "$SPECIFIC_SITE_ID" ]; then
+            echo "🎯 Deploying specific site: $SPECIFIC_SITE_ID"
+            
+            # Fetch only the specific site config
+            CONFIGS=$(curl -s -X GET \
+              "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/$SPECIFIC_SITE_ID" \
+              -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+              -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+              -H "Content-Type: application/json")
+            
+            echo "Single site config:"
+            echo "$CONFIGS"
+            
+            # Wrap single document in documents array format
+            MATRIX=$(echo "$CONFIGS" | jq -c '{
+              include: [{
+                siteId: (.$id // .siteId // ""),
+                siteName: (.siteName // ""),
+                appId: (.appId // "120839"),
+                primaryColor: (.primaryColor // "#ff444f"),
+                secondaryColor: (.secondaryColor // "#85acb0"),
+                domain: (.domain // "")
+              }]
+            }' 2>/dev/null)
+          else
+            echo "🌍 Deploying all sites"
+            
+            # Fetch all site configs from Appwrite database
+            CONFIGS=$(curl -s -X GET \
+              "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents" \
+              -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+              -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+              -H "Content-Type: application/json")
+            
+            echo "Raw API Response:"
+            echo "$CONFIGS"
+            
+            # Check if response is valid JSON and has documents
+            if ! echo "$CONFIGS" | jq empty 2>/dev/null; then
+              echo "❌ Invalid JSON response from API"
+              echo "Response: $CONFIGS"
+              echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            # Check if we got documents array
+            DOC_COUNT=$(echo "$CONFIGS" | jq -r '.documents // [] | length' 2>/dev/null || echo "0")
+            echo "Found $DOC_COUNT site configurations"
+            
+            if [ "$DOC_COUNT" -eq "0" ] || [ -z "$DOC_COUNT" ] || [ "$DOC_COUNT" = "null" ]; then
+              echo "⚠️ No site configurations found in database"
+              echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            # Extract documents and format for matrix (handle null values)
+            MATRIX=$(echo "$CONFIGS" | jq -c '
+              {
+                include: [
+                  (.documents // [])[] | 
+                  {
+                    siteId: (.siteId // ""),
+                    siteName: (.siteName // ""),
+                    appId: (.appId // "120839"),
+                    primaryColor: (.primaryColor // "#ff444f"),
+                    secondaryColor: (.secondaryColor // "#85acb0"),
+                    domain: (.domain // "")
+                  }
+                ]
+              }
+            ' 2>/dev/null)
           fi
-          
-          # Check if we got documents array
-          DOC_COUNT=$(echo "$CONFIGS" | jq -r '.documents // [] | length' 2>/dev/null || echo "0")
-          echo "Found $DOC_COUNT site configurations"
-          
-          if [ "$DOC_COUNT" -eq "0" ] || [ -z "$DOC_COUNT" ] || [ "$DOC_COUNT" = "null" ]; then
-            echo "⚠️ No site configurations found in database"
-            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Extract documents and format for matrix (handle null values)
-          MATRIX=$(echo "$CONFIGS" | jq -c '
-            {
-              include: [
-                (.documents // [])[] | 
-                {
-                  siteId: (.siteId // ""),
-                  siteName: (.siteName // ""),
-                  appId: (.appId // "120839"),
-                  primaryColor: (.primaryColor // "#ff444f"),
-                  secondaryColor: (.secondaryColor // "#85acb0"),
-                  domain: (.domain // "")
-                }
-              ]
-            }
-          ' 2>/dev/null)
           
           if [ -z "$MATRIX" ] || [ "$MATRIX" = "null" ]; then
             echo "⚠️ Failed to parse site configurations"
