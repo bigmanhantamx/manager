@@ -32,20 +32,48 @@ jobs:
             -H "Content-Type: application/json")
           
           echo "Raw API Response:"
-          echo "$CONFIGS" | jq '.' || echo "$CONFIGS"
+          echo "$CONFIGS"
           
-          # Check if we got documents
-          DOC_COUNT=$(echo "$CONFIGS" | jq -r '.documents | length' || echo "0")
+          # Check if response is valid JSON and has documents
+          if ! echo "$CONFIGS" | jq empty 2>/dev/null; then
+            echo "❌ Invalid JSON response from API"
+            echo "Response: $CONFIGS"
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check if we got documents array
+          DOC_COUNT=$(echo "$CONFIGS" | jq -r '.documents // [] | length' 2>/dev/null || echo "0")
           echo "Found $DOC_COUNT site configurations"
           
-          if [ "$DOC_COUNT" -eq "0" ]; then
+          if [ "$DOC_COUNT" -eq "0" ] || [ -z "$DOC_COUNT" ] || [ "$DOC_COUNT" = "null" ]; then
             echo "⚠️ No site configurations found in database"
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          # Extract documents and format for matrix
-          MATRIX=$(echo "$CONFIGS" | jq -c '{include: [.documents[] | {siteId: .siteId, siteName: .siteName, appId: .appId, primaryColor: .primaryColor, secondaryColor: .secondaryColor, domain: (.domain // "")}]}')
+          # Extract documents and format for matrix (handle null values)
+          MATRIX=$(echo "$CONFIGS" | jq -c '
+            {
+              include: [
+                (.documents // [])[] | 
+                {
+                  siteId: (.siteId // ""),
+                  siteName: (.siteName // ""),
+                  appId: (.appId // "120839"),
+                  primaryColor: (.primaryColor // "#ff444f"),
+                  secondaryColor: (.secondaryColor // "#85acb0"),
+                  domain: (.domain // "")
+                }
+              ]
+            }
+          ' 2>/dev/null)
+          
+          if [ -z "$MATRIX" ] || [ "$MATRIX" = "null" ]; then
+            echo "⚠️ Failed to parse site configurations"
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Matrix for deployment:"
