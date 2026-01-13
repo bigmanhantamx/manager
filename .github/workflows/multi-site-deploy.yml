@@ -51,7 +51,7 @@ jobs:
             # Wrap single document in documents array format
             MATRIX=$(echo "$CONFIGS" | jq -c '{
               include: [{
-                siteId: (."\$id" // .siteId // ""),
+                siteId: (.["$id"] // .siteId // ""),
                 siteName: (.siteName // "Unnamed Site"),
                 appId: (.appId // "120839"),
                 primaryColor: (.primaryColor // "#ff444f"),
