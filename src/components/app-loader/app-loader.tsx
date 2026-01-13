@@ -1,202 +1,170 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import './app-loader.scss';
 
 interface AppLoaderProps {
     onLoadingComplete: () => void;
-    duration?: number; // Duration in milliseconds, default 6000ms (6 seconds)
+    duration?: number; // Duration in milliseconds, default 12000ms (12 seconds)
 }
 
-const AppLoader: React.FC<AppLoaderProps> = ({ onLoadingComplete, duration = 6000 }) => {
-  const [progress, setProgress] = useState(1);
-  const [isVisible, setIsVisible] = useState(true);
-  const bgElementsRef = useRef<HTMLDivElement>(null);
+const AppLoader: React.FC<AppLoaderProps> = ({ onLoadingComplete, duration = 12000 }) => {
+    const [isVisible, setIsVisible] = useState(true);
+    const [progress, setProgress] = useState(0);
+    const [messageIndex, setMessageIndex] = useState(0);
 
-  // Create twinkling stars
-  const createStars = () => {
-    if (!bgElementsRef.current) return;
+    const messages = [
+        { title: 'Initializing' },
+        { title: 'Connecting to trading server...' },
+        { title: 'Loading charts' },
+        { title: 'Loading Blocky' },
+        { title: 'Preparing dashboard' },
+    ];
 
-    // Create many more stars for a rich starfield effect
-    for (let i = 0; i < 200; i++) {
-      const star = document.createElement('div');
-      star.className = 'star';
+    const steps = ['Connection', 'Market Data', 'AI Engine', 'Trading Bots', 'Final Setup'] as const;
+    const stepIndex = Math.min(steps.length - 1, Math.max(0, messageIndex));
 
-      const size = Math.random() * 4 + 0.5; // Varied sizes from 0.5px to 4.5px
-      const leftPos = Math.random() * 100;
-      const topPos = Math.random() * 100;
-      const duration = 2 + Math.random() * 8; // Faster twinkling
-      const delay = Math.random() * 10; // More varied delays
-      const opacity = 0.2 + Math.random() * 0.8; // More opacity variation
+    // Initialize loading timer
+    // Total loader duration fixed at 6 seconds
+    const effectiveDuration = 6000;
 
-      star.style.width = `${size}px`;
-      star.style.height = `${size}px`;
-      star.style.left = `${leftPos}%`;
-      star.style.top = `${topPos}%`;
-      star.style.setProperty('--duration', `${duration}s`);
-      star.style.setProperty('--opacity', opacity.toString());
-      star.style.animationDelay = `${delay}s`;
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsVisible(false);
+            setTimeout(onLoadingComplete, 300); // Wait for fade out animation
+        }, effectiveDuration);
 
-      // Add some stars with different shapes for variety
-      if (Math.random() > 0.8) {
-        star.style.borderRadius = '0';
-        star.style.transform = 'rotate(45deg)';
-      }
+        return () => clearTimeout(timer);
+    }, [onLoadingComplete, effectiveDuration]);
 
-      bgElementsRef.current.appendChild(star);
-    }
-  };
+    // Progress bar and message advancement
+    useEffect(() => {
+        if (!isVisible) return;
 
-  // Create falling dollar bills
-  const createDollar = () => {
-    if (!bgElementsRef.current) return;
+        setProgress(0);
+        // Evenly split the 6s across all messages
+        const totalPerMessageMs = Math.max(200, Math.floor(effectiveDuration / messages.length));
+        const stepMs = totalPerMessageMs / 100;
+        let current = 0;
 
-    const dollarSigns = ['💰', '💵', '💲', '🪙', '💴', '💶', '💷', '💸', '🤑', '💎'];
-    const dollar = document.createElement('div');
-    dollar.className = 'dollar';
-    dollar.textContent = dollarSigns[Math.floor(Math.random() * dollarSigns.length)];
+        const interval = setInterval(
+            () => {
+                current += 1;
+                if (current > 100) {
+                    clearInterval(interval);
+                    // move to next message if any, and restart
+                    setMessageIndex(prev => {
+                        const next = prev + 1;
+                        if (next < messages.length) {
+                            // trigger next cycle
+                            setProgress(0);
+                            return next;
+                        }
+                        return prev;
+                    });
+                    return;
+                }
+                setProgress(current);
+            },
+            Math.max(4, stepMs)
+        );
 
-    const leftPos = Math.random() * 100;
-    const duration = 3 + Math.random() * 8; // Faster falling
-    const delay = Math.random() * 2; // Less delay for more continuous flow
-    const size = 0.6 + Math.random() * 1.8; // More size variation
-    const rotation = Math.random() * 360;
+        return () => clearInterval(interval);
+    }, [isVisible, messageIndex, duration]);
 
-    dollar.style.left = `${leftPos}%`;
-    dollar.style.animationDuration = `${duration}s`;
-    dollar.style.animationDelay = `${delay}s`;
-    dollar.style.fontSize = `${size}em`;
-    dollar.style.opacity = (0.4 + Math.random() * 0.6).toString();
-    dollar.style.transform = `rotate(${rotation}deg)`;
+    if (!isVisible) return null;
 
-    // Add some horizontal drift for more natural movement
-    const drift = (Math.random() - 0.5) * 20;
-    dollar.style.setProperty('--drift', `${drift}px`);
+    return (
+        <div className='georgetown-loader'>
+            <div className='smart-loader-bg' />
 
-    bgElementsRef.current.appendChild(dollar);
+            <div className='smart-loader__wrap'>
+                <div className='smart-loader__card'>
+                    <div className='smart-loader__header'>
+                        <div className='smart-loader__brand'>
+                            <div className='smart-loader__brand-mark' aria-hidden='true'>
+                                <svg width='22' height='22' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
+                                    <path
+                                        d='M4 19V5M4 19H20M7 15L11 11L14 14L19 9'
+                                        stroke='currentColor'
+                                        strokeWidth='2'
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                    />
+                                </svg>
+                            </div>
+                            <div className='smart-loader__brand-text'>
+                                <div className='smart-loader__brand-title'>SMART</div>
+                                <div className='smart-loader__brand-subtitle'>TRADING HUB</div>
+                            </div>
+                        </div>
 
-    setTimeout(() => {
-      if (dollar.parentNode === bgElementsRef.current) {
-        bgElementsRef.current?.removeChild(dollar);
-      }
-    }, duration * 1000);
-  };
+                        <div className='smart-loader__welcome'>
+                            <div className='smart-loader__welcome-line'>
+                                Welcome to <span className='smart-loader__welcome-accent'>D-Botspace</span>
+                            </div>
+                            <div className='smart-loader__welcome-sub'>Automated Precision Trading System</div>
+                        </div>
+                    </div>
 
-  // Create multiple dollars at once for heavy rain effect
-  const createDollarBurst = () => {
-    // Create 5-8 dollars at once
-    const burstCount = 5 + Math.floor(Math.random() * 4);
-    for (let i = 0; i < burstCount; i++) {
-      setTimeout(() => createDollar(), i * 50); // Slight stagger
-    }
-  };
+                    <div className='smart-loader__steps'>
+                        {steps.map((label, idx) => {
+                            const is_done = idx < stepIndex;
+                            const is_active = idx === stepIndex;
+                            return (
+                                <div
+                                    key={label}
+                                    className={[
+                                        'smart-loader__step',
+                                        is_done ? 'smart-loader__step--done' : '',
+                                        is_active ? 'smart-loader__step--active' : '',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' ')}
+                                >
+                                    <div className='smart-loader__step-dot' aria-hidden='true'>
+                                        {is_done ? '✓' : idx + 1}
+                                    </div>
+                                    <div className='smart-loader__step-label'>{label}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
 
-  // Container hover effect
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const container = e.currentTarget;
-    const x = e.clientX / window.innerWidth;
-    const y = e.clientY / window.innerHeight;
-    container.style.transform = `translateY(0) rotate3d(${y}, ${x}, 0, ${(x - 0.5) * 2}deg) scale(1.02)`;
-  };
+                    <div className='smart-loader__tiles'>
+                        {[
+                            { label: 'Free Bots', icon: '🤖' },
+                            { label: 'AI Bots', icon: '🧠' },
+                            { label: 'Analysis Tool', icon: '📊' },
+                            { label: 'Smart Analysis', icon: '✨' },
+                            { label: 'Copy Trading', icon: '📄' },
+                            { label: 'Signals', icon: '📡' },
+                        ].map(t => (
+                            <div key={t.label} className='smart-loader__tile' aria-hidden='true'>
+                                <div className='smart-loader__tile-icon'>{t.icon}</div>
+                                <div className='smart-loader__tile-label'>{t.label}</div>
+                            </div>
+                        ))}
+                    </div>
 
-  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.transform = 'translateY(0) rotate3d(0, 0, 0, 0) scale(1)';
-  };
+                    <div className='smart-loader__status'>
+                        <div className='smart-loader__status-line'>Establishing secure connection...</div>
+                        <div className='smart-loader__status-sub'>{messages[messageIndex]?.title || 'Connecting...'}</div>
+                    </div>
 
-  // Initialize animations
-  useEffect(() => {
-    createStars();
+                    <div className='progress-wrapper'>
+                        <div className='progress-track'>
+                            <div className='loading-bar-glow' style={{ width: `${progress}%` }} />
+                            <div className='loading-bar-pulse' />
+                        </div>
+                        <div className='progress-counter'>{progress}%</div>
+                    </div>
 
-    // Create initial heavy dollar rain
-    for (let i = 0; i < 100; i++) {
-      setTimeout(() => createDollar(), i * 30); // Create 100 dollars quickly
-    }
-
-    // Create continuous dollar bursts
-    const dollarInterval = setInterval(createDollarBurst, 150); // More frequent bursts
-
-    // Also create individual dollars for continuous flow
-    const singleDollarInterval = setInterval(createDollar, 80);
-    
-    // Loading simulation (6 seconds)
-    let currentProgress = 1;
-    let speed = 0.5;
-    const progressInterval = setInterval(() => {
-      if (currentProgress < 30) {
-        speed += 0.15;
-      } else if (currentProgress > 85) {
-        speed *= 0.85;
-      }
-
-      currentProgress = Math.min(currentProgress + speed, 100);
-      setProgress(Math.floor(currentProgress));
-
-      if (currentProgress >= 100) {
-        clearInterval(progressInterval);
-        // Add a small delay before hiding to show 100% completion
-        setTimeout(() => {
-          setIsVisible(false);
-          setTimeout(onLoadingComplete, 300); // Wait for fade out animation
-        }, 200);
-      }
-    }, 40);
-
-    return () => {
-      clearInterval(dollarInterval);
-      clearInterval(singleDollarInterval);
-      clearInterval(progressInterval);
-    };
-  }, [onLoadingComplete]);
-
-  if (!isVisible) return null;
-
-  return (
-    <div className="trading-hub-loader">
-      <div className="background-elements" ref={bgElementsRef}></div>
-      
-      <div 
-        className="loader-container"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div className="logo">
-          <div className="logo-main">PRO</div>
-          <div className="logo-sub">TRADINGHUB</div>
+                    <div className='smart-loader__footer'>
+                        © 2025 D-Botspace Powered by Deriv. All rights reserved.
+                    </div>
+                </div>
+            </div>
         </div>
-        
-        <div className="welcome-message">
-          <div className="welcome-title">Welcome to deriv third party powered website</div>
-          <div className="welcome-text">Gain access to premium trading features unavailable on the official platform</div>
-        </div>
-        
-        <div className="features-container">
-          <div className="feature-main">Automate your trades now</div>
-          <ul className="feature-list">
-            <li className="feature-item">Analysis Tool</li>
-            <li className="feature-item">Trading Bots</li>
-            <li className="feature-item">Copy Trading</li>
-          </ul>
-          <div className="feature-tagline">Making trading smooth, simple, and stress-free</div>
-        </div>
-        
-        <div className="progress-container">
-          <div className="progress-text">
-            <span>Loading premium features</span>
-            <span className="progress-percent">{progress}%</span>
-          </div>
-          <div className="progress-bar">
-            <div 
-              className="progress-fill" 
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <div className="progress-dots">
-            <div className="progress-dot"></div>
-            <div className="progress-dot"></div>
-            <div className="progress-dot"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default AppLoader;

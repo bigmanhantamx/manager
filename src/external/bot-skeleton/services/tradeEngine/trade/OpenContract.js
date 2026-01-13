@@ -11,14 +11,18 @@ export default Engine =>
                 if (data.msg_type === 'proposal_open_contract') {
                     const contract = data.proposal_open_contract;
 
+                    // Match millern's simple check - only process if contract ID matches
                     if (!contract || !this.expectedContractId(contract?.contract_id)) {
                         return;
                     }
 
                     this.setContractFlags(contract);
 
+                    // Use simple assignment like millern
                     this.data.contract = contract;
 
+                    // For normal accounts: use api_base.account_info.loginid directly (like millern)
+                    // For special CR accounts: account_info should already be set to demo account
                     broadcastContract({ accountID: api_base.account_info.loginid, ...contract });
 
                     if (this.isSold) {
@@ -28,6 +32,22 @@ export default Engine =>
                         contractStatus({
                             id: 'contract.sold',
                             data: contract.transaction_ids.sell,
+                            contract,
+                        });
+
+                        if (this.afterPromise) {
+                            this.afterPromise();
+                        }
+
+                        this.store.dispatch(sell());
+                    } else if (this.isExpired) {
+                        // Handle expired contracts like millern - treat as sold
+                        this.contractId = '';
+                        clearTimeout(this.transaction_recovery_timeout);
+                        this.updateTotals(contract);
+                        contractStatus({
+                            id: 'contract.sold',
+                            data: contract.transaction_ids?.sell || contract.transaction_ids?.buy,
                             contract,
                         });
 

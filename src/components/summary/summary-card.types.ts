@@ -14,6 +14,10 @@ export type TContractInfo = Omit<
     entry_tick_time?: TDateType;
     exit_tick?: TDateType;
     exit_tick_time?: TDateType;
+    display_transaction_ids?: {
+        buy?: number;
+        sell?: number;
+    };
 };
 
 export interface TSummaryCardProps {

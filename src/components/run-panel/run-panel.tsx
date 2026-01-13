@@ -268,7 +268,7 @@ const RunPanel = observer(() => {
     const { statistics } = transactions;
     const { active_tour, active_tab } = dashboard;
     const { total_payout, total_profit, total_stake, won_contracts, lost_contracts, number_of_runs } = statistics;
-    const { BOT_BUILDER, CHART, SMART_TRADER } = DBOT_TABS;
+    const { BOT_BUILDER, CHART, STRATEGIES, TRADING_BOTS, ANALYSIS_TOOL } = DBOT_TABS;
 
     React.useEffect(() => {
         onMount();
@@ -311,7 +311,10 @@ const RunPanel = observer(() => {
         />
     );
 
-    const show_run_panel = [BOT_BUILDER, CHART, SMART_TRADER].includes(active_tab) || active_tour;
+    const show_run_panel = [BOT_BUILDER, CHART, TRADING_BOTS, ANALYSIS_TOOL].includes(active_tab) || active_tour;
+    // Don't show RunPanel on DTrader tab - manual trading only
+    const { DTRADER } = DBOT_TABS;
+    if (active_tab === DTRADER) return null;
     if ((!show_run_panel && isDesktop) || active_tour === 'bot_builder') return null;
 
     return (
@@ -333,7 +336,7 @@ const RunPanel = observer(() => {
                 >
                     {content}
                 </Drawer>
-                {!isDesktop && <MobileDrawerFooter />}
+                {!isDesktop && active_tab !== STRATEGIES && <MobileDrawerFooter />}
             </div>
             <SelfExclusion onRunButtonClick={onRunButtonClick} />
             <StatisticsInfoModal

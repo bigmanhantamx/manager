@@ -19,7 +19,6 @@ interface BotData {
 
 const DEFAULT_FEATURES = ['Automated Trading', 'Risk Management', 'Profit Optimization'];
 
-
 const FreeBots = observer(() => {
     const { dashboard, app } = useStore();
     const { active_tab, setActiveTab, setPendingFreeBot } = dashboard;
@@ -27,23 +26,47 @@ const FreeBots = observer(() => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Manifest-driven list for instant load and prefetch
+    // Bot descriptions mapping
+    const getBotDescription = (botName: string): string => {
+        const descriptions: { [key: string]: string } = {
+            'OVER1 R32 PRO':
+                'Professional Over 1 trading bot with R32 recovery strategy. Optimized for high win rates with intelligent recovery mechanisms and risk management.',
+            'OVER2 R43 PRO':
+                'Advanced Over 2 bot featuring R43 recovery system. Designed for consistent profits with sophisticated entry points and recovery strategies.',
+            'THE CMV PRO':
+                'Premium CMV Pro trading bot with multi-strategy approach. Combines technical analysis with automated execution for maximum profitability.',
+            'UNDER BLAST PRO':
+                'High-performance Under trading bot with blast strategy. Optimized for rapid execution and high-probability trades in Under markets.',
+            'UNDER7 R56 PRO':
+                'Professional Under 7 bot with R56 recovery mechanism. Features intelligent risk management and recovery strategies for consistent returns.',
+            'UNDER8 R67 PRO':
+                'Advanced Under 8 trading bot with R67 recovery system. Designed for optimal performance with sophisticated pattern recognition and recovery.',
+        };
+
+        // Try exact match first
+        if (descriptions[botName]) {
+            return descriptions[botName];
+        }
+
+        // Try partial matches
+        for (const key in descriptions) {
+            if (botName.includes(key) || key.includes(botName)) {
+                return descriptions[key];
+            }
+        }
+
+        return `Advanced trading bot: ${botName}. Features automated trading, risk management, and profit optimization.`;
+    };
+
+    // Show selected bots from public/xml (explicit curated list)
     const getXmlFiles = () => {
         return [
-            '$DollarprinterbotOrignal$.xml',
-            '360 PRINTER BOT____ [ Version 2.2 ].xml',
-            'Candle-Mine Version 2  (2).xml',
-            'DIFFERS KILLER BOT.xml',
-            'Digits Switcher Bot.xml',
-            'DOLLAR  HUNTER BOT ORIGINAL UPDATED.xml',
-            'Legoo-sniper-bot.xml',
-            'MKOREAN SV6 BOT (1).xml',
-            'Marvel PRO Fully Auto V 2.0  [Original] by {www.360tradinghub.co.ke}.xml',
-            'Marvel SPLIT Version by 360 Trading Hub.xml',
-            "Mathews' speed bot.xml",
-            'Printed_dollars_Bot.xml',
-            'TC Bot 1.1.xml',
-            'legoospeedbot.xml',
+            'THE CMV PRO.xml',
+            'UNDER BLAST PRO.xml',
+            'OVER1_R32 PRO.xml',
+            'OVER2_R43 PRO.xml',
+            'UNDER8_R67 PRO.xml',
+            'UNDER7_R56 PRO.xml',
         ];
     };
 
@@ -92,48 +115,42 @@ const FreeBots = observer(() => {
     // Load bots with instant UI and progressive loading (no blocking spinner)
     useEffect(() => {
         const loadBots = async () => {
-            if (active_tab !== DBOT_TABS.FREE_BOTS) return;
+            // Always load when component is mounted (now used as sub-component)
 
             setError(null);
 
             // 0) Immediately render skeleton cards from a small fallback list
             const fallback = getXmlFiles().map(file => ({ name: file.replace('.xml', ''), file }));
-            const initialSkeleton: BotData[] = fallback.map(item => ({
-                name: (item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' '),
-                description: `Advanced trading bot: ${(item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' ')}`,
-                difficulty: 'Intermediate',
-                strategy: 'Multi-Strategy',
-                features: DEFAULT_FEATURES,
-                xml: '',
-            }));
-            setAvailableBots(initialSkeleton);
-            setIsLoading(false); // hide "Loading free bots..." right away
-
-            try {
-                // 1) Fetch manifest with timeout; fallback to initial list if slow
-                const withTimeout = <T,>(p: Promise<T>, ms = 800): Promise<T | null> =>
-                    new Promise(resolve => {
-                        const t = setTimeout(() => resolve(null), ms);
-                        p.then(r => {
-                            clearTimeout(t);
-                            resolve(r);
-                        }).catch(() => {
-                            clearTimeout(t);
-                            resolve(null);
-                        });
-                    });
-
-                const manifest = (await withTimeout(getBotsManifest(), 800)) || fallback;
-
-                // 2) If manifest differs, update skeletons to match
-                const skeletonBots: BotData[] = manifest.map(item => ({
-                    name: (item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' '),
-                    description: `Advanced trading bot: ${(item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' ')}`,
+            const initialSkeleton: BotData[] = fallback.map(item => {
+                const botName = (item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' ');
+                return {
+                    name: botName,
+                    description: getBotDescription(botName),
                     difficulty: 'Intermediate',
                     strategy: 'Multi-Strategy',
                     features: DEFAULT_FEATURES,
                     xml: '',
-                }));
+                };
+            });
+            setAvailableBots(initialSkeleton);
+            setIsLoading(false); // hide "Loading free bots..." right away
+
+            try {
+                // Force use of explicit list only; ignore remote manifest
+                const manifest = getXmlFiles().map(file => ({ name: file.replace('.xml', ''), file }));
+
+                // Update skeletons to our explicit list
+                const skeletonBots: BotData[] = manifest.map(item => {
+                    const botName = (item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' ');
+                    return {
+                        name: botName,
+                        description: getBotDescription(botName),
+                        difficulty: 'Intermediate',
+                        strategy: 'Multi-Strategy',
+                        features: DEFAULT_FEATURES,
+                        xml: '',
+                    };
+                });
                 setAvailableBots(skeletonBots);
 
                 // 3) Load XMLs progressively in background
@@ -146,7 +163,7 @@ const FreeBots = observer(() => {
                             const botName = (item.name || item.file.replace('.xml', '')).replace(/[_-]/g, ' ');
                             loadedBots.push({
                                 name: botName,
-                                description: `Advanced trading bot: ${botName}`,
+                                description: getBotDescription(botName),
                                 difficulty: 'Intermediate',
                                 strategy: 'Multi-Strategy',
                                 features: DEFAULT_FEATURES,
@@ -166,7 +183,7 @@ const FreeBots = observer(() => {
 
         loadBots();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [active_tab]);
+    }, []);
 
     return (
         <div className='free-bots'>
@@ -200,26 +217,20 @@ const FreeBots = observer(() => {
                                     <Text size='s' weight='bold' className='free-bot-card__title'>
                                         {bot.name}
                                     </Text>
-                                    <div className='free-bot-card__badges'>
-                                        <span className='free-bot-card__badge free-bot-card__badge--difficulty'>
-                                            {bot.difficulty}
-                                        </span>
-                                        <span className='free-bot-card__badge free-bot-card__badge--strategy'>
-                                            {bot.strategy}
-                                        </span>
+
+                                    {/* Star Rating */}
+                                    <div className='free-bot-card__rating'>
+                                        <span className='star'>★</span>
+                                        <span className='star'>★</span>
+                                        <span className='star'>★</span>
+                                        <span className='star'>★</span>
+                                        <span className='star'>★</span>
                                     </div>
-                                </div>
 
-                                <Text size='xs' color='general' className='free-bot-card__description'>
-                                    {bot.description}
-                                </Text>
-
-                                <div className='free-bot-card__features'>
-                                    {bot.features.map((feature, featureIndex) => (
-                                        <span key={featureIndex} className='free-bot-card__feature'>
-                                            {feature}
-                                        </span>
-                                    ))}
+                                    {/* Bot Description */}
+                                    <Text size='xs' className='free-bot-card__description'>
+                                        {bot.description}
+                                    </Text>
                                 </div>
 
                                 <Button
@@ -230,7 +241,7 @@ const FreeBots = observer(() => {
                                     type='button'
                                     disabled={!bot.xml} // Disable if XML not loaded yet
                                 >
-                                    {bot.xml ? localize('Load Bot') : localize('Loading...')}
+                                    {bot.xml ? 'LOAD PREMIUM BOT' : 'LOADING...'}
                                 </Button>
                             </div>
                         ))}

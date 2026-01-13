@@ -52,6 +52,10 @@
                     &:focus-within {
                         border-color: var(--text-general);
                     }
+
+                    &--error {
+                        border-color: var(--text-general) !important;
+                    }
                 }
 
                 &__field {

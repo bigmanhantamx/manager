@@ -35,9 +35,29 @@ export default Engine =>
         }
 
         updateTotals(contract) {
-            const { sell_price: sellPrice, buy_price: buyPrice, currency } = contract;
+            // CRITICAL: Always use REAL API contract data for statistics and martingale
+            // Never use displayProfit or displayCurrency here - only use real API values
+            // This is used by the bot's internal statistics which martingale strategies may rely on
+            const { sell_price: sellPrice, buy_price: buyPrice, currency, profit: contractProfit, payout, bid_price } = contract;
 
-            const profit = getRoundedNumber(Number(sellPrice) - Number(buyPrice), currency);
+            // Use contract.profit if available (most reliable)
+            // Otherwise calculate from sell_price - buy_price
+            // If sell_price is missing, use payout or bid_price as fallback
+            let profit;
+            if (contractProfit !== undefined && contractProfit !== null) {
+                profit = getRoundedNumber(Number(contractProfit), currency);
+            } else if (sellPrice !== undefined && sellPrice !== null) {
+                profit = getRoundedNumber(Number(sellPrice) - Number(buyPrice), currency);
+            } else if (payout !== undefined && payout !== null) {
+                profit = getRoundedNumber(Number(payout) - Number(buyPrice), currency);
+            } else if (bid_price !== undefined && bid_price !== null) {
+                profit = getRoundedNumber(Number(bid_price) - Number(buyPrice), currency);
+            } else {
+                profit = getRoundedNumber(0 - Number(buyPrice), currency);
+            }
+
+            // Log for debugging martingale issues
+            console.log('[Total.updateTotals] 💰 Profit for statistics (REAL API):', profit, 'Win:', profit > 0);
 
             const win = profit > 0;
 
@@ -66,7 +86,8 @@ export default Engine =>
                 totalPayout: accountStat.totalPayout,
             });
 
-            log(win ? LogTypes.PROFIT : LogTypes.LOST, { currency, profit });
+            // Removed profit/loss log messages from journal as per user request
+            // log(win ? LogTypes.PROFIT : LogTypes.LOST, { currency, profit });
         }
 
         updateAndReturnTotalRuns() {

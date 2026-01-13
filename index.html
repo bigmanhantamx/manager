@@ -2,34 +2,177 @@
 <html lang="en" dir="auto">
     <head>
         <meta charset="UTF-8" />
-        <link rel="icon" type="image/svg+xml" href="/deriv-logo.svg" />
+        <link rel="icon" type="image/png" href="/assets/images/deriv insider.jpg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        <meta name="title" content="Build a trading bot without coding | Deriv Bot." />
+
+        <!-- Primary Meta Tags -->
+        <meta name="title" content="DBOTSPACE - Professional Trading Bot Builder & Copy Trading Platform" />
         <meta
             name="description"
-            content="Import your current bot or learn how to create a trading bot from scratch with our detailed guides, FAQs, and tutorials. Start with a quick strategy!"
+            content="Create profitable trading bots without coding. Professional Deriv trading bot builder with copy trading, free bots, and advanced strategies. Start trading smarter today!"
         />
-        <meta property="og:title" content="Deriv Bot" />
+        <meta
+            name="keywords"
+            content="deriv trading bot, trading bot builder, copy trading, binary options bot, forex bot, automated trading, DBOTSPACE, trading strategies, bot builder, algorithmic trading"
+        />
+        <meta name="author" content="DBOTSPACE" />
+        <meta name="robots" content="index, follow" />
+        <meta name="language" content="English" />
+        <meta name="revisit-after" content="7 days" />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://derivinsider.site/" />
+        <meta property="og:title" content="DBOTSPACE - Professional Trading Bot Builder" />
         <meta
             property="og:description"
-            content="Import your current bot or learn how to create a trading bot from scratch with our detailed guides, FAQs, and tutorials. Start with a quick strategy!"
+            content="Create profitable trading bots without coding. Professional Deriv trading bot builder with copy trading, free bots, and advanced strategies."
         />
-        <title>Build a trading bot without coding | Deriv Bot.</title>
+        <meta property="og:image" content="/assets/images/deriv insider.jpg" />
+        <meta property="og:site_name" content="DBOTSPACE" />
+        <meta property="og:locale" content="en_US" />
+
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://derivinsider.site/" />
+        <meta property="twitter:title" content="DBOTSPACE - Professional Trading Bot Builder" />
+        <meta
+            property="twitter:description"
+            content="Create profitable trading bots without coding. Professional Deriv trading bot builder with copy trading, free bots, and advanced strategies."
+        />
+        <meta property="twitter:image" content="/assets/images/deriv insider.jpg" />
+
+        <!-- Additional SEO Meta Tags -->
+        <meta name="theme-color" content="#ffffff" />
+        <meta name="msapplication-TileColor" content="#ffffff" />
+        <meta name="application-name" content="DBOTSPACE" />
+
+        <title>DBOTSPACE - Professional Trading Bot Builder & Copy Trading Platform</title>
+
+        <!-- Structured Data -->
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "WebApplication",
+                "name": "DBOTSPACE",
+                "description": "Professional trading bot builder and copy trading platform for Deriv",
+                "url": "https://derivinsider.site",
+                "applicationCategory": "FinanceApplication",
+                "operatingSystem": "Web Browser",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD"
+                },
+                "creator": {
+                    "@type": "Organization",
+                    "name": "DBOTSPACE"
+                },
+                "featureList": [
+                    "Trading Bot Builder",
+                    "Copy Trading",
+                    "Free Trading Bots",
+                    "Advanced Strategies",
+                    "No Coding Required"
+                ]
+            }
+        </script>
+
         <style>
             :root {
                 font-size: 62.5%;
             }
         </style>
-      <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/service-worker.js').catch(function(err){
-            console.warn('SW registration failed', err);
-          });
-        });
-      }
-    </script>
-  </head>
+        <!-- Security Protection Script -->
+        <script>
+            (function () {
+                'use strict';
+
+                // Check if mobile device
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                    navigator.userAgent
+                );
+
+                // Disable right-click (desktop only)
+                if (!isMobile) {
+                    document.addEventListener(
+                        'contextmenu',
+                        function (e) {
+                            e.preventDefault();
+                            return false;
+                        },
+                        false
+                    );
+
+                    document.addEventListener(
+                        'mousedown',
+                        function (e) {
+                            if (e.button === 2 || e.which === 3) {
+                                e.preventDefault();
+                                return false;
+                            }
+                        },
+                        false
+                    );
+                }
+
+                // Disable DevTools shortcuts (desktop only)
+                if (!isMobile) {
+                    document.addEventListener(
+                        'keydown',
+                        function (e) {
+                            // F12
+                            if (e.key === 'F12' || e.keyCode === 123) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                            }
+                            // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+                            if (
+                                e.ctrlKey &&
+                                e.shiftKey &&
+                                (e.key === 'I' ||
+                                    e.key === 'J' ||
+                                    e.key === 'C' ||
+                                    e.keyCode === 73 ||
+                                    e.keyCode === 74 ||
+                                    e.keyCode === 67)
+                            ) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                            }
+                            // Ctrl+U (View Source)
+                            if (e.ctrlKey && (e.key === 'u' || e.keyCode === 85)) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                            }
+                            // Ctrl+S (Save Page)
+                            if (e.ctrlKey && (e.key === 's' || e.keyCode === 83)) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                            }
+                        },
+                        false
+                    );
+                }
+
+                // DevTools detection DISABLED - too many false positives
+                // Only right-click and keyboard shortcuts are blocked
+            })();
+        </script>
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function () {
+                    navigator.serviceWorker.register('/service-worker.js').catch(function (err) {
+                        console.warn('SW registration failed', err);
+                    });
+                });
+            }
+        </script>
+    </head>
 
     <body class="body theme theme--light">
         <div id="modal_root" class="modal-root"></div>
@@ -67,14 +210,14 @@
                     init: function () {
                         setTimeout(() => {
                             var n = t.createElement('script');
-                            (n.async = !0),
+                            ((n.async = !0),
                                 (n.type = 'text/javascript'),
                                 (n.src = 'https://cdn.livechatinc.com/tracking.js'),
-                                t.head.appendChild(n);
+                                t.head.appendChild(n));
                         }, 3000);
                     },
                 };
-                !n.__lc.asyncInit && e.init(), (n.LiveChatWidget = n.LiveChatWidget || e);
+                (!n.__lc.asyncInit && e.init(), (n.LiveChatWidget = n.LiveChatWidget || e));
             })(window, document, [].slice);
         </script>
         <!-- End LiveChat script -->

@@ -14,11 +14,11 @@
     display: flex;
     overflow: hidden;
     width: 100%;
-    height: calc(100vh - 9rem);
-    padding: 1.6rem;
+    height: calc(100vh - 4rem); // Adjusted for larger header (4rem header + navigation)
+    padding: 0; // Remove all padding to eliminate space between header and navigation
 
     @include mobile-or-tablet-screen {
-        height: calc(100vh - 6rem);
+        height: calc(100vh - 3.5rem); // Adjusted for larger mobile header (3.5rem header + navigation)
         padding: 0;
     }
 
@@ -30,6 +30,10 @@
         height: 100%;
         display: flex;
         flex-direction: column;
+
+        @include mobile-or-tablet-screen {
+            padding-bottom: var(--mobile-footer-height, 6rem); // Space for fixed footer
+        }
 
         &.no-scroll {
             overflow: hidden;
@@ -52,32 +56,60 @@
 
         .dc-tabs {
             &__active-line {
-                background-color: #FFA500;
-                transition: none;
+                display: none !important; // hide default line, we'll draw our own
             }
 
             &__active {
-                background: #FFA500;
-                color: var(--text-prominent) !important;
+                background: #3b82f6 !important; // Lighter blue background for active tab like screenshot
+                color: #ffffff !important; // White text for active tab
+                position: relative;
+                border-radius: 4px !important;
+                margin: 0 0.25rem !important;
+                padding: 0.5rem 1rem !important;
+                border: none !important;
+                box-shadow: none !important;
 
-                // Ensure active tab text uses theme-aware color
+                // active text/icon color - white
                 * {
-                    color: var(--text-prominent) !important;
+                    color: #ffffff !important;
                 }
 
-                // Ensure active tab icons use theme-aware color
+                // active icons - white
                 svg,
                 svg > path,
                 svg > g > path {
-                    fill: var(--text-prominent) !important;
+                    fill: #ffffff !important;
+                }
+
+                // Remove animated underline for Binarytool style
+                &::after {
+                    display: none !important;
                 }
             }
 
-
-
             &__list {
-                background: #FFA500;
-                justify-content: start;
+                background: #1e3a8a !important; // Dark blue background like screenshot
+                justify-content: flex-start; // Start from left like friend's design
+                border-bottom: none !important; // Remove border
+                padding: 0; // Remove all padding to eliminate space
+                margin: 0; // Remove any margins
+                gap: 0; // Remove gaps between items
+
+                // Override tab width calculation to be more compact
+                .dc-tabs__item {
+                    width: auto !important; // Let tabs size naturally
+                    padding: 0.5rem 1.2rem !important; // Padding for all tabs
+                    margin: 0.25rem 0.25rem !important; // Small margin for spacing
+                    flex-shrink: 0; // Prevent shrinking
+                    border-radius: 8px !important; // Rounded corners for all tabs
+                    transition: background-color 0.2s ease !important; // Smooth transition
+                    color: #ffffff !important; // White text for all navigation items
+                }
+
+                // Override the default justify-content: center from tabs.scss
+                &:not(&--header-fit-content) {
+                    justify-content: flex-start !important; // Start from left like friend's design
+                }
 
                 @include mobile-or-tablet-screen {
                     overflow-x: auto;
@@ -96,7 +128,7 @@
                             @include mobile-or-tablet-screen {
                                 width: 100%;
                                 overflow-x: auto;
-                                padding: 0.8rem 1.6rem 0;
+                                padding: 0; // Remove padding to eliminate space between header and navigation
                             }
                         }
                     }
@@ -110,12 +142,54 @@
             }
 
             &__content {
-                height: 100%;
+                height: 100vh;
+                min-height: 100vh;
                 flex: 1;
+                margin: 0;
+                padding: 0;
+                position: relative;
+                overflow: hidden;
+
+                // Allow scrolling when Strategies component is rendered
+                &:has(.strategies--standalone),
+                &.strategies-tab-active {
+                    overflow-y: auto !important;
+                    overflow-x: hidden !important;
+                    -webkit-overflow-scrolling: touch;
+                    height: 100vh;
+                    max-height: 100vh;
+                }
+
+                .strategies--standalone {
+                    height: auto;
+                    min-height: 100%;
+                    width: 100%;
+                    padding-bottom: 8rem; // Extra padding for scrolling
+                }
 
                 @include mobile-or-tablet-screen {
                     width: 100%;
                     overflow-x: auto;
+                    padding-bottom: 6rem; // Space for fixed footer
+
+                    // Allow scrolling for Strategies on mobile
+                    &:has(.strategies--standalone),
+                    &.strategies-tab-active {
+                        overflow-y: auto !important;
+                        overflow-x: hidden !important;
+                        -webkit-overflow-scrolling: touch;
+                        height: calc(100vh - 3.5rem - 6rem) !important; // Account for mobile header (3.5rem) and footer (6rem)
+                        max-height: calc(100vh - 3.5rem - 6rem) !important;
+                        padding-bottom: 0 !important; // Remove padding from container, let content handle it
+                    }
+
+                    .strategies--standalone {
+                        height: auto !important;
+                        min-height: calc(100% + 20rem) !important; // Ensure content extends beyond viewport
+                        width: 100%;
+                        padding-bottom: 25rem !important; // Very large padding to ensure last card button is fully visible
+                        box-sizing: border-box;
+                    }
 
                     &--no-result {
                         @include flex-center;
@@ -218,6 +292,96 @@
     }
 }
 
+/* Flying rocket next to SpeedBots tab in header */
+.nav-speedbots-rocket {
+    display: inline-block;
+    margin-left: 0.4rem;
+    font-size: 1.2em;
+    animation: rocketFly 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.8));
+    vertical-align: middle;
+}
+
+/* Bouncing rocket next to SpeedBot tab (in submenu) */
+.nav-rocket {
+    display: inline-block;
+    margin-left: 0.4rem;
+    animation: rocketBounce 1.8s ease-in-out infinite;
+}
+
+@keyframes nav-underline {
+    0% {
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        filter: hue-rotate(30deg);
+    }
+    100% {
+        filter: hue-rotate(0deg);
+    }
+}
+
+/* Crown icon next to Matches tab */
+.nav-crown {
+    display: inline-block;
+    margin-left: 0.4rem;
+    font-size: 1.2em;
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+    vertical-align: middle; // Prevent upward movement
+    background: transparent !important; // Ensure no white background
+}
+
+/* Matches label styling */
+.nav-matches-label {
+    background: transparent !important; // Ensure no white background
+    vertical-align: middle; // Prevent upward movement
+}
+
+/* SpeedBot label - no background, matches other headings */
+.nav-speedbot-label {
+    display: inline-block;
+    margin-left: 0.2rem;
+}
+
+@keyframes rocketFly {
+    0% {
+        transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+        opacity: 1;
+    }
+    25% {
+        transform: translateY(-8px) translateX(4px) rotate(-15deg) scale(1.1);
+        opacity: 0.9;
+    }
+    50% {
+        transform: translateY(-12px) translateX(8px) rotate(-25deg) scale(1.2);
+        opacity: 0.8;
+    }
+    75% {
+        transform: translateY(-8px) translateX(4px) rotate(-15deg) scale(1.1);
+        opacity: 0.9;
+    }
+    100% {
+        transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes rocketBounce {
+    0%,
+    100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-3px) rotate(-5deg);
+    }
+    50% {
+        transform: translateY(-6px) rotate(0deg);
+    }
+    75% {
+        transform: translateY(-3px) rotate(5deg);
+    }
+}
+
 .animation__wrapper {
     .animation {
         &__button#db-animation {
@@ -284,6 +448,7 @@
 
         @include mobile-or-tablet-screen {
             height: var(--tab-content-height-mobile);
+            padding-bottom: 6rem; // Space for fixed footer
             background: var(--general-main-1);
 
             .smartcharts {
@@ -428,6 +593,7 @@
         inset-inline-start: 0;
         width: 100vw;
         height: var(--tab-content-height-mobile);
+        padding-bottom: 6rem; // Space for fixed footer
     }
 }
 
@@ -757,130 +923,291 @@
     justify-content: center;
 }
 
-// Theme-aware navigation tabs for improved visibility
-// Higher specificity to override any conflicting styles
-body.theme--light .main__container .main__tabs .dc-tabs__item,
-body.theme--dark .main__container .main__tabs .dc-tabs__item {
-    // Use theme-aware text color for better visibility
-    color: var(--text-prominent) !important;
+// Navigation tabs styling to match screenshot - dark blue background, white text, light blue icons
+.main__container .main__tabs .dc-tabs__item {
+    // All navigation items use white text
+    color: #ffffff !important; // White text for all navigation items
+    font-weight: 500 !important;
+    font-family:
+        Arial,
+        Helvetica,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        sans-serif !important;
+    font-size: 14px !important;
+    background: transparent !important;
 
     * {
-        color: var(--text-prominent) !important;
-        font-weight: bold !important;
+        color: #ffffff !important;
+        font-weight: 500 !important;
+        font-family:
+            Arial,
+            Helvetica,
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            sans-serif !important;
+    }
+
+    span,
+    div,
+    p,
+    label {
+        color: #ffffff !important;
+        font-weight: 500 !important;
+        font-family:
+            Arial,
+            Helvetica,
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            sans-serif !important;
+    }
+
+    // Remove glowing effects
+    svg {
+        position: relative;
+        filter: none;
+        fill: #60a5fa !important; // Light blue icons - override any inline fill attributes
+
+        &::before {
+            display: none;
+        }
     }
 
     svg,
     svg > path,
-    svg > g > path {
-        fill: var(--text-prominent) !important;
+    svg > g > path,
+    svg > * {
+        fill: #60a5fa !important; // Light blue icons for all navigation items
+        stroke: none !important;
+        filter: none !important;
     }
 
-    &:not(.dc-tabs__active) {
-        // Inactive tabs with reduced opacity for better hierarchy
-        color: var(--text-less-prominent) !important;
-
-        * {
-            color: var(--text-less-prominent) !important;
-        }
-
-        svg,
-        svg > path,
-        svg > g > path {
-            fill: var(--text-less-prominent) !important;
-        }
-
-        &:hover {
-            // Full prominence on hover for better UX
-            color: var(--text-prominent) !important;
-
-            * {
-                color: var(--text-prominent) !important;
-            }
-
-            svg,
-            svg > path,
-            svg > g > path {
-                fill: var(--text-prominent) !important;
-            }
-        }
-    }
-
-    // Special handling for active tabs to ensure maximum visibility
+    // Active tab - lighter blue background with white text
     &.dc-tabs__active {
-        color: var(--text-prominent) !important;
+        background: #3b82f6 !important; // Lighter blue background for active tab
+        color: #ffffff !important; // White text
+        font-weight: bold !important;
+        font-family:
+            Arial,
+            Helvetica,
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            sans-serif !important;
+        font-size: 14px !important;
 
         * {
-            color: var(--text-prominent) !important;
+            color: #ffffff !important;
             font-weight: bold !important;
+            font-family:
+                Arial,
+                Helvetica,
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                sans-serif !important;
+        }
+
+        span,
+        div,
+        p,
+        label {
+            color: #ffffff !important;
+            font-weight: bold !important;
+            font-family:
+                Arial,
+                Helvetica,
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                sans-serif !important;
+        }
+
+        svg {
+            filter: none;
+            fill: #ffffff !important; // White icons for active tab - override any inline fill attributes
+
+            &::before {
+                display: none;
+            }
+        }
+
+        svg,
+        svg > path,
+        svg > g > path,
+        svg > * {
+            fill: #ffffff !important; // White icons for active tab
+            stroke: none !important;
+            filter: none !important;
+        }
+    }
+
+    // Hover effect for inactive tabs
+    &:hover:not(.dc-tabs__active) {
+        color: #ffffff !important;
+        background: rgba(255, 255, 255, 0.1) !important; // Slight white hover on dark blue
+        transition: all 0.2s ease;
+
+        * {
+            color: #ffffff !important;
+            font-weight: 500 !important;
+        }
+
+        span,
+        div,
+        p,
+        label {
+            color: #ffffff !important;
+            font-weight: 500 !important;
+        }
+
+        svg {
+            filter: none;
         }
 
         svg,
         svg > path,
         svg > g > path {
-            fill: var(--text-prominent) !important;
+            fill: #60a5fa !important; // Light blue icons on hover
+            stroke: none !important;
+            filter: none !important;
         }
     }
 }
 
-// Fallback for cases where body classes might not be applied
-.main__container .main__tabs .dc-tabs__item {
-    // Use theme-aware text color for better visibility
-    color: var(--text-prominent) !important;
+// Force all tab text and icons - override any default styles to match screenshot
+.dc-tabs__item {
+    color: #ffffff !important; // White text for all navigation items
+    font-family:
+        Arial,
+        Helvetica,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
 
+    span,
+    div,
+    p,
     * {
-        color: var(--text-prominent) !important;
-        font-weight: bold !important;
+        color: #ffffff !important;
+        font-family:
+            Arial,
+            Helvetica,
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            sans-serif !important;
+        font-weight: 500 !important;
+    }
+
+    svg {
+        position: relative;
+        filter: none;
+        fill: #60a5fa !important; // Light blue icons - override any inline fill attributes
+
+        &::before {
+            display: none;
+        }
     }
 
     svg,
+    svg *,
     svg > path,
     svg > g > path {
-        fill: var(--text-prominent) !important;
+        fill: #60a5fa !important; // Light blue icons for all navigation items
+        stroke: none !important;
+        filter: none !important;
     }
 
-    &:not(.dc-tabs__active) {
-        // Inactive tabs with reduced opacity for better hierarchy
-        color: var(--text-less-prominent) !important;
-
-        * {
-            color: var(--text-less-prominent) !important;
-        }
-
-        svg,
-        svg > path,
-        svg > g > path {
-            fill: var(--text-less-prominent) !important;
-        }
-
-        &:hover {
-            // Full prominence on hover for better UX
-            color: var(--text-prominent) !important;
-
-            * {
-                color: var(--text-prominent) !important;
-            }
-
-            svg,
-            svg > path,
-            svg > g > path {
-                fill: var(--text-prominent) !important;
-            }
-        }
-    }
-
-    // Special handling for active tabs to ensure maximum visibility
+    // Active tab styling
     &.dc-tabs__active {
-        color: var(--text-prominent) !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        background: #3b82f6 !important; // Lighter blue background for active tab
 
+        span,
+        div,
+        p,
         * {
-            color: var(--text-prominent) !important;
+            color: #ffffff !important;
             font-weight: bold !important;
         }
 
+        svg {
+            fill: #ffffff !important; // White icons for active tab - override any inline fill attributes
+        }
+
         svg,
+        svg *,
         svg > path,
         svg > g > path {
-            fill: var(--text-prominent) !important;
+            fill: #ffffff !important; // White icons for active tab
+        }
+    }
+}
+
+// Override any theme-based colors to match screenshot
+body.theme--light .dc-tabs__item,
+body.theme--dark .dc-tabs__item {
+    color: #ffffff !important; // White text for all navigation items
+
+    span,
+    div,
+    p,
+    * {
+        color: #ffffff !important;
+        font-family:
+            Arial,
+            Helvetica,
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            sans-serif !important;
+        font-weight: 500 !important;
+    }
+
+    svg {
+        fill: #60a5fa !important; // Light blue icons - override any inline fill attributes
+    }
+
+    svg,
+    svg *,
+    svg > path,
+    svg > g > path {
+        fill: #60a5fa !important; // Light blue icons for all navigation items
+        stroke: none !important;
+        filter: none !important;
+    }
+
+    // Active tab
+    &.dc-tabs__active {
+        color: #ffffff !important;
+        font-weight: bold !important;
+        background: #3b82f6 !important; // Lighter blue background for active tab
+
+        span,
+        div,
+        p,
+        * {
+            color: #ffffff !important;
+            font-weight: bold !important;
+        }
+
+        svg {
+            fill: #ffffff !important; // White icons for active tab - override any inline fill attributes
+        }
+
+        svg,
+        svg *,
+        svg > path,
+        svg > g > path {
+            fill: #ffffff !important; // White icons for active tab
         }
     }
 }

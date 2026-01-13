@@ -88,16 +88,16 @@ const PopoverItem = ({ icon, title, children }: TPopoverItem) => (
 
 const PopoverContent = ({ contract }: TPopoverContent) => (
     <div className='transactions__popover-content'>
-        {contract.transaction_ids && (
+        {(contract.transaction_ids || contract.display_transaction_ids) && (
             <PopoverItem title={<Localize i18n_default_text='Reference IDs' />}>
-                {contract.transaction_ids.buy && (
+                {(contract.display_transaction_ids?.buy ?? contract.transaction_ids?.buy) && (
                     <div className='transactions__popover-value'>
-                        {`${contract.transaction_ids.buy} ${localize('(Buy)')}`}
+                        {`${contract.display_transaction_ids?.buy ?? contract.transaction_ids?.buy} ${localize('(Buy)')}`}
                     </div>
                 )}
-                {contract.transaction_ids.sell && (
+                {(contract.display_transaction_ids?.sell ?? contract.transaction_ids?.sell) && (
                     <div className='transactions__popover-value'>
-                        {`${contract.transaction_ids.sell} ${localize('(Sell)')}`}
+                        {`${contract.display_transaction_ids?.sell ?? contract.transaction_ids?.sell} ${localize('(Sell)')}`}
                     </div>
                 )}
             </PopoverItem>
@@ -163,13 +163,13 @@ const Transaction = ({ contract, active_transaction_id, onClickTransaction }: TT
             zIndex={popover_zindex.TRANSACTION.toString()}
             alignment={isDbotRTL() ? 'right' : 'left'}
             className='transactions__item-wrapper'
-            is_open={!!(contract && active_transaction_id === contract?.transaction_ids?.buy)}
+            is_open={!!(contract && active_transaction_id === (contract?.display_transaction_ids?.buy ?? contract?.transaction_ids?.buy))}
             message={contract && <PopoverContent contract={contract} />}
         >
             <div
                 data-testid='dt_transactions_item'
                 className='transactions__item'
-                onClick={() => onClickTransaction && onClickTransaction(contract?.transaction_ids?.buy || null)}
+                onClick={() => onClickTransaction && onClickTransaction((contract?.display_transaction_ids?.buy ?? contract?.transaction_ids?.buy) || null)}
             >
                 <div className='transactions__cell transactions__trade-type'>
                     <div className='transactions__loader-container'>

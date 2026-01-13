@@ -163,7 +163,45 @@ class DBot {
                 window.Blockly.getMainWorkspace().strategy_to_load = main_xml;
                 window.Blockly.getMainWorkspace().RTL = isDbotRTL();
 
+                // Store reference to 'this' for use in nested function
+                const that = this;
                 let file_name = config().default_file_name;
+
+                // Define function to load strategy into workspace
+                const loadStrategyIntoWorkspace = () => {
+                    const event_group = `dbot-load${Date.now()}`;
+                    window.Blockly.Events.setGroup(event_group);
+                    // Normalize foreign XML block names before import for Free Bots and similar flows
+                    if (typeof window.Blockly.derivWorkspace.strategy_to_load === 'string') {
+                        let s = window.Blockly.derivWorkspace.strategy_to_load;
+                        // Alias notify -> btnotify
+                        s = s.replace(/type=\"notify\"/g, 'type=\"btnotify\"');
+                        // Alias math_number_positive -> math_number
+                        s = s.replace(/type=\"math_number_positive\"/g, 'type=\"math_number\"');
+                        // Strip nested xmlns on mutation nodes
+                        s = s.replace(/<mutation\s+xmlns=\"[^\"]*\"/g, '<mutation');
+                        // Remove control characters
+                        s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+                        window.Blockly.derivWorkspace.strategy_to_load = s;
+                    }
+                    window.Blockly.Xml.domToWorkspace(
+                        window.Blockly.utils.xml.textToDom(window.Blockly.derivWorkspace.strategy_to_load),
+                        that.workspace
+                    );
+                    const { save_modal } = DBotStore.instance;
+
+                    save_modal.updateBotName(file_name);
+                    that.workspace.cleanUp(0, is_mobile ? 60 : 56);
+                    that.workspace.clearUndo();
+
+                    window.dispatchEvent(new Event('resize'));
+                    window.addEventListener('dragover', DBot.handleDragOver);
+                    window.addEventListener('drop', e => DBot.handleDropOver(e, handleFileChange));
+                    // disable overflow
+                    el_scratch_div.parentNode.style.overflow = 'hidden';
+                    resolve();
+                };
+
                 if (recent_files && recent_files.length) {
                     const latest_file = recent_files[0];
                     window.Blockly.derivWorkspace.strategy_to_load = latest_file.xml;
@@ -171,26 +209,31 @@ class DBot {
                     file_name = latest_file.name;
                     window.Blockly.derivWorkspace.current_strategy_id = latest_file.id;
                     window.Blockly.getMainWorkspace().current_strategy_id = latest_file.id;
+                    loadStrategyIntoWorkspace();
+                } else {
+                    // Load CMV PRO as default bot when there are no recent files
+                    fetch('/xml/THE CMV PRO.xml')
+                        .then(cmvResponse => {
+                            if (cmvResponse.ok) {
+                                return cmvResponse.text();
+                            }
+                            throw new Error('Failed to fetch CMV bot');
+                        })
+                        .then(cmvXml => {
+                            window.Blockly.derivWorkspace.strategy_to_load = cmvXml;
+                            window.Blockly.getMainWorkspace().strategy_to_load = cmvXml;
+                            file_name = 'THE CMV PRO';
+                            const cmvId = window.Blockly.utils.idGenerator.genUid();
+                            window.Blockly.derivWorkspace.current_strategy_id = cmvId;
+                            window.Blockly.getMainWorkspace().current_strategy_id = cmvId;
+                            loadStrategyIntoWorkspace();
+                        })
+                        .catch(error => {
+                            console.warn('Failed to load default CMV bot:', error);
+                            // Fall back to main_xml if CMV fails to load
+                            loadStrategyIntoWorkspace();
+                        });
                 }
-
-                const event_group = `dbot-load${Date.now()}`;
-                window.Blockly.Events.setGroup(event_group);
-                window.Blockly.Xml.domToWorkspace(
-                    window.Blockly.utils.xml.textToDom(window.Blockly.derivWorkspace.strategy_to_load),
-                    this.workspace
-                );
-                const { save_modal } = DBotStore.instance;
-
-                save_modal.updateBotName(file_name);
-                this.workspace.cleanUp(0, is_mobile ? 60 : 56);
-                this.workspace.clearUndo();
-
-                window.dispatchEvent(new Event('resize'));
-                window.addEventListener('dragover', DBot.handleDragOver);
-                window.addEventListener('drop', e => DBot.handleDropOver(e, handleFileChange));
-                // disable overflow
-                el_scratch_div.parentNode.style.overflow = 'hidden';
-                resolve();
             } catch (error) {
                 // TODO: Handle error.
                 reject(error);

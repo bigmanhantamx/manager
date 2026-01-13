@@ -54,11 +54,11 @@
         }
 
         label {
-            color: var(--brand-red-coral) !important;
+            color: var(--text-general) !important;
         }
 
         & ::placeholder {
-            color: var(--text-loss-danger) !important;
+            color: var(--text-general) !important;
             opacity: 1 !important;
         }
     }
@@ -84,7 +84,7 @@
         }
 
         &--error {
-            border-color: var(--brand-red-coral) !important;
+            border-color: var(--text-general) !important;
         }
 
         &--disabled {

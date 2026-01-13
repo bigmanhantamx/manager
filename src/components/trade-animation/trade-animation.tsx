@@ -26,12 +26,18 @@ const TradeAnimation = observer(({ className, should_show_overlay }: TTradeAnima
     const { active_tab } = dashboard;
     const { has_active_bot, has_saved_bots } = blockly_store;
     const { isMobile } = useDevice();
+    
+    // Don't show TradeAnimation (Run button) on DTrader tab - manual trading only
+    if (active_tab === DBOT_TABS.DTRADER) {
+        return null;
+    }
 
     const { is_contract_completed, profit } = summary_card;
     const {
         contract_stage,
         is_stop_button_visible,
         is_stop_button_disabled,
+        is_running,
         onRunButtonClick,
         onStopBotClick,
         performSelfExclusionCheck,
@@ -121,7 +127,8 @@ const TradeAnimation = observer(({ className, should_show_overlay }: TTradeAnima
     // 1. There are no active or saved bots AND the user is not in the bot builder tab
     const should_disable_run = has_no_bots && !is_bot_builder_tab;
 
-    const is_disabled = is_stop_button_visible ? false : shouldDisable || should_disable_run;
+    // CRITICAL: Disable button when running to prevent multiple simultaneous runs (especially on desktop)
+    const is_disabled = is_stop_button_visible ? false : shouldDisable || should_disable_run || is_running;
 
     // Show the tooltip when:
     // 1. The user is NOT in the bot builder tab, AND
@@ -214,6 +221,11 @@ const TradeAnimation = observer(({ className, should_show_overlay }: TTradeAnima
                     id={button_props.id}
                     icon={button_props.icon}
                     onClick={() => {
+                        // CRITICAL: Prevent multiple clicks when already running
+                        if (is_running && !is_stop_button_visible) {
+                            console.warn('[Trade Animation] ⚠️ Bot is already running, ignoring click');
+                            return;
+                        }
                         setShouldDisable(true);
                         if (is_stop_button_visible) {
                             onStopBotClick();

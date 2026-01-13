@@ -200,8 +200,14 @@ button.dc-input-wrapper {
     }
 
     &--error {
-        color: $COLOR_RED;
-        border: 1px solid $COLOR_RED !important;
+        color: var(--text-general);
+        border: 1px solid var(--text-general) !important;
+    }
+
+    &:invalid {
+        color: var(--text-general);
+        border-color: var(--text-general) !important;
+        box-shadow: none !important;
     }
 
     &:disabled {

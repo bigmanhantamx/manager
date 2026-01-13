@@ -33,6 +33,7 @@ const setLocalStorageToken = async (
                 clientAccounts[account.loginid] = account;
             });
 
+            // CRITICAL: Save all account data first to ensure persistence
             localStorage.setItem('accountsList', JSON.stringify(accountsList));
             localStorage.setItem('clientAccounts', JSON.stringify(clientAccounts));
 
@@ -67,13 +68,30 @@ const setLocalStorageToken = async (
                     if (filteredTokens.length) {
                         localStorage.setItem('authToken', filteredTokens[0].token);
                         localStorage.setItem('active_loginid', filteredTokens[0].loginid);
+                        
+                        // CRITICAL: Set logged_state cookie to ensure session persists
+                        Cookies.set('logged_state', 'true', {
+                            domain: window.location.hostname,
+                            expires: 30,
+                            path: '/',
+                            secure: window.location.protocol === 'https:',
+                        });
                         return;
                     }
                 }
             }
 
+            // Fallback: Set tokens even if API authorization fails
             localStorage.setItem('authToken', loginInfo[0].token);
             localStorage.setItem('active_loginid', loginInfo[0].loginid);
+            
+            // CRITICAL: Set logged_state cookie to ensure session persists
+            Cookies.set('logged_state', 'true', {
+                domain: window.location.hostname,
+                expires: 30,
+                path: '/',
+                secure: window.location.protocol === 'https:',
+            });
         } catch (error) {
             console.error('Error setting up login info:', error);
         }

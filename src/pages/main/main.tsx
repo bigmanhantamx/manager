@@ -22,13 +22,13 @@ import {
     LabelPairedChartLineCaptionRegularIcon,
     LabelPairedObjectsColumnCaptionRegularIcon,
     LabelPairedPuzzlePieceTwoCaptionBoldIcon,
-    LabelPairedSignalCaptionRegularIcon,
 } from '@deriv/quill-icons/LabelPaired';
 import { LegacyChartsIcon, LegacyGuide1pxIcon, LegacyIndicatorsIcon } from '@deriv/quill-icons/Legacy';
 import { requestOidcAuthentication } from '@deriv-com/auth-client';
 import { Localize, localize } from '@deriv-com/translations';
 import { useDevice } from '@deriv-com/ui';
 import RunPanel from '../../components/run-panel';
+import SpeedBotFloatingStop from '../../components/speedbot-floating-stop';
 import ChartModal from '../chart/chart-modal';
 import Dashboard from '../dashboard';
 import RunStrategy from '../dashboard/run-strategy';
@@ -37,14 +37,14 @@ import './main.scss';
 const ChartWrapper = lazy(() => import('../chart/chart-wrapper'));
 
 const TradingView = lazy(() => import('../tradingview'));
-const AnalysisTool = lazy(() => import('../analysis-tool'));
-const Signals = lazy(() => import('../signals'));
+// Analysis tool entry now lives at src/pages/analysis-tool/analysis-tool.tsx
+const AnalysisTools = lazy(() => import('../analysis-tool'));
 const CopyTrading = lazy(() => import('../copy-trading'));
-const SmartTrader = lazy(() => import('../smart-trader'));
+const Strategies = lazy(() => import('../free-bots/strategies'));
 const ProTool = lazy(() => import('../pro-tool'));
 const Dtrader = lazy(() => import('../dtrader'));
-// Import FreeBots directly instead of lazy loading for faster access
-import FreeBots from '../free-bots';
+// Import TradingBots directly instead of lazy loading for faster access
+import TradingBots from '../free-bots/trading-bots';
 
 const AppWrapper = observer(() => {
     const { connectionStatus } = useApiBase();
@@ -74,9 +74,19 @@ const AppWrapper = observer(() => {
         [key: string]: string;
     };
     const { clear } = summary_card;
-    const { DASHBOARD, BOT_BUILDER } = DBOT_TABS;
+    const { DASHBOARD, BOT_BUILDER, STRATEGIES, TRADING_BOTS } = DBOT_TABS;
     const init_render = React.useRef(true);
-    const hash = ['dashboard', 'bot_builder', 'chart', 'free_bots', 'copy_trading', 'smart_trader', 'dtrader'];
+    const hash = [
+        'dashboard',
+        'bot_builder',
+        'chart',
+        'trading_bots',
+        'analysis_tool',
+        'strategies',
+        'copy_trading',
+        'dtrader',
+        'tradingview',
+    ];
     const { isDesktop } = useDevice();
     const location = useLocation();
     const navigate = useNavigate();
@@ -116,11 +126,17 @@ const AppWrapper = observer(() => {
         }
 
         if (init_render.current) {
-            setActiveTab(Number(active_hash_tab));
-            if (!isDesktop) handleTabChange(Number(active_hash_tab));
+            // On page refresh, default to BOT_BUILDER tab if no hash is present
+            const tabToSet = location.hash ? Number(active_hash_tab) : DBOT_TABS.BOT_BUILDER;
+            setActiveTab(tabToSet);
+            if (!isDesktop) handleTabChange(tabToSet);
+            // Navigate to the correct hash if not already set
+            if (!location.hash) {
+                navigate(`#${hash[tabToSet] || hash[DBOT_TABS.BOT_BUILDER]}`);
+            }
             init_render.current = false;
         } else {
-            navigate(`#${hash[active_tab] || hash[0]}`);
+            navigate(`#${hash[active_tab] || hash[DBOT_TABS.BOT_BUILDER]}`);
         }
         if (active_tour !== '') {
             setActiveTour('');
@@ -289,7 +305,6 @@ const AppWrapper = observer(() => {
                                     <ChartWrapper show_digits_stats={false} />
                                 </Suspense>
                             </div>
-
                             <div
                                 label={
                                     <>
@@ -298,17 +313,53 @@ const AppWrapper = observer(() => {
                                             width='24px'
                                             fill='var(--text-general)'
                                         />
-                                        <Localize i18n_default_text='Free Bots' />
+                                        <Localize i18n_default_text='Trading Bots' />
                                     </>
                                 }
-                                id='id-free-bots'
+                                id='id-trading-bots'
                             >
-                                <FreeBots />
+                                <TradingBots />
                             </div>
                             <div
                                 label={
                                     <>
-                                        <LabelPairedSignalCaptionRegularIcon
+                                        <LegacyIndicatorsIcon height='16px' width='16px' fill='var(--text-general)' />
+                                        <Localize i18n_default_text='Analysis Tool' />
+                                    </>
+                                }
+                                id='id-analysis-tool'
+                            >
+                                <Suspense
+                                    fallback={
+                                        <ChunkLoader message={localize('Please wait, loading Analysis Tool...')} />
+                                    }
+                                >
+                                    <AnalysisTools />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <LabelPairedPuzzlePieceTwoCaptionBoldIcon
+                                            height='24px'
+                                            width='24px'
+                                            fill='var(--text-general)'
+                                        />
+                                        <Localize i18n_default_text='Strategies' />
+                                    </>
+                                }
+                                id='id-strategies'
+                            >
+                                <Suspense
+                                    fallback={<ChunkLoader message={localize('Please wait, loading Strategies...')} />}
+                                >
+                                    <Strategies />
+                                </Suspense>
+                            </div>
+                            <div
+                                label={
+                                    <>
+                                        <LabelPairedObjectsColumnCaptionRegularIcon
                                             height='24px'
                                             width='24px'
                                             fill='var(--text-general)'
@@ -324,44 +375,6 @@ const AppWrapper = observer(() => {
                                     }
                                 >
                                     <CopyTrading />
-                                </Suspense>
-                            </div>
-                            <div
-                                label={
-                                    <>
-                                        <LabelPairedPuzzlePieceTwoCaptionBoldIcon
-                                            height='24px'
-                                            width='24px'
-                                            fill='var(--text-general)'
-                                        />
-                                        <Localize i18n_default_text='Smart Trader' />
-                                    </>
-                                }
-                                id='id-smart-trader'
-                            >
-                                <Suspense
-                                    fallback={<ChunkLoader message={localize('Please wait, loading Smart Trader...')} />}
-                                >
-                                    <SmartTrader />
-                                </Suspense>
-                            </div>
-                            <div
-                                label={
-                                    <>
-                                        <LabelPairedPuzzlePieceTwoCaptionBoldIcon
-                                            height='24px'
-                                            width='24px'
-                                            fill='var(--text-general)'
-                                        />
-                                        <Localize i18n_default_text='pRO TOOL' />
-                                    </>
-                                }
-                                id='id-pro-tool'
-                            >
-                                <Suspense
-                                    fallback={<ChunkLoader message={localize('Please wait, loading pRO TOOL...')} />}
-                                >
-                                    <ProTool />
                                 </Suspense>
                             </div>
                             <div
@@ -398,55 +411,23 @@ const AppWrapper = observer(() => {
                                     <TradingView />
                                 </Suspense>
                             </div>
-                            <div
-                                label={
-                                    <>
-                                        <LegacyIndicatorsIcon height='16px' width='16px' fill='var(--text-general)' />
-                                        <Localize i18n_default_text='Analysis Tool' />
-                                    </>
-                                }
-                                id='id-analysis-tool'
-                            >
-                                <Suspense
-                                    fallback={
-                                        <ChunkLoader message={localize('Please wait, loading Analysis Tool...')} />
-                                    }
-                                >
-                                    <AnalysisTool />
-                                </Suspense>
-                            </div>
-                            <div
-                                label={
-                                    <>
-                                        <LabelPairedSignalCaptionRegularIcon
-                                            height='16px'
-                                            width='16px'
-                                            fill='var(--text-general)'
-                                        />
-                                        <Localize i18n_default_text='Signals' />
-                                    </>
-                                }
-                                id='id-signals'
-                            >
-                                <Suspense
-                                    fallback={<ChunkLoader message={localize('Please wait, loading Signals...')} />}
-                                >
-                                    <Signals />
-                                </Suspense>
-                            </div>
                         </Tabs>
                     </div>
                 </div>
             </div>
             <DesktopWrapper>
-                <div className='main__run-strategy-wrapper'>
-                    <RunStrategy />
-                    <RunPanel />
-                </div>
+                {/* Hide RunStrategy and RunPanel on DTrader tab - manual trading only */}
+                {active_tab !== DBOT_TABS.DTRADER && (
+                    <div className='main__run-strategy-wrapper'>
+                        {active_tab !== DBOT_TABS.TRADING_BOTS && <RunStrategy />}
+                        <RunPanel />
+                    </div>
+                )}
                 <ChartModal />
                 <TradingViewModal />
             </DesktopWrapper>
-            <MobileWrapper>{!is_open && <RunPanel />}</MobileWrapper>
+            <MobileWrapper>{!is_open && active_tab !== DBOT_TABS.STRATEGIES && active_tab !== DBOT_TABS.DTRADER && <RunPanel />}</MobileWrapper>
+            <SpeedBotFloatingStop />
             <Dialog
                 cancel_button_text={cancel_button_text || localize('Cancel')}
                 className='dc-dialog__wrapper--fixed'

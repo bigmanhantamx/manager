@@ -177,15 +177,24 @@
     }
 
     @include mobile-screen {
-        padding: 0 1rem;
+        padding: 0 0.8rem; // Reduce padding to prevent squeezing
         margin-right: -0.8rem;
+        flex-shrink: 0; // Prevent account switcher from shrinking
+        min-width: fit-content; // Ensure it doesn't get squeezed
 
         &__balance {
             font-size: 1.4rem;
+            white-space: nowrap; // Prevent balance text from wrapping
+            flex-shrink: 0; // Prevent balance from shrinking
 
             &--no-currency {
                 white-space: nowrap;
             }
+        }
+
+        &__wrapper {
+            min-width: fit-content; // Ensure wrapper doesn't get squeezed
+            flex-shrink: 0; // Prevent wrapper from shrinking
         }
     }
 
@@ -258,6 +267,7 @@
     margin: 0 0.8rem;
     height: 4rem;
     position: relative;
+    z-index: 20; // ensure dropdown stays above run panel and header overlays
 
     &--is-loading {
         position: absolute;

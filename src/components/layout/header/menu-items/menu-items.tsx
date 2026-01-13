@@ -22,17 +22,25 @@ export const MenuItems = observer(() => {
     const getCurrency = client.getCurrency;
     const currency = getCurrency?.();
 
+    // Check if special CR account is active
+    const showAsCR = typeof window !== 'undefined' ? localStorage.getItem('show_as_cr') : null;
+    const isSpecialCR = showAsCR === 'CR6779123';
+    
     // Check if the account is a demo account
     // Use the URL parameter to determine if it's a demo account, as this will update when the account changes
     const urlParams = new URLSearchParams(window.location.search);
     const account_param = urlParams.get('account');
-    const is_virtual = client.is_virtual || account_param === 'demo' || false;
+    // For special CR accounts, don't treat as virtual even if client.is_virtual is true
+    const is_virtual = (client.is_virtual && !isSpecialCR) || (account_param === 'demo' && !isSpecialCR) || false;
 
     // Use handleTraderHubRedirect for all links
     const getModifiedHref = (originalHref: string) => {
         const redirect_url = new URL(originalHref);
 
-        if (is_virtual) {
+        if (isSpecialCR && currency) {
+            // For special CR accounts, use the CR account currency (USD) instead of 'demo'
+            redirect_url.searchParams.set('account', currency);
+        } else if (is_virtual) {
             // For demo accounts, set the account parameter to 'demo'
             redirect_url.searchParams.set('account', 'demo');
         } else if (currency) {
@@ -108,11 +116,16 @@ export const TradershubLink = observer(() => {
     const getCurrency = client.getCurrency;
     const currency = getCurrency?.();
 
+    // Check if special CR account is active
+    const showAsCR = typeof window !== 'undefined' ? localStorage.getItem('show_as_cr') : null;
+    const isSpecialCR = showAsCR === 'CR6779123';
+    
     // Check if the account is a demo account
     // Use the URL parameter to determine if it's a demo account, as this will update when the account changes
     const urlParams = new URLSearchParams(window.location.search);
     const account_param = urlParams.get('account');
-    const is_virtual = client.is_virtual || account_param === 'demo' || false;
+    // For special CR accounts, don't treat as virtual even if client.is_virtual is true
+    const is_virtual = (client.is_virtual && !isSpecialCR) || (account_param === 'demo' && !isSpecialCR) || false;
 
     // Use the handleTraderHubRedirect function with the is_virtual flag
 
@@ -122,7 +135,10 @@ export const TradershubLink = observer(() => {
         // If we have a redirect_url_str, we still need to add the account parameter
         try {
             const redirect_url = new URL(redirect_url_str);
-            if (is_virtual) {
+            if (isSpecialCR && currency) {
+                // For special CR accounts, use the CR account currency (USD) instead of 'demo'
+                redirect_url.searchParams.set('account', currency);
+            } else if (is_virtual) {
                 // For demo accounts, set the account parameter to 'demo'
                 redirect_url.searchParams.set('account', 'demo');
             } else if (currency) {

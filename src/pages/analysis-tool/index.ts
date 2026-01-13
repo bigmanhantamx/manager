@@ -1,1 +1,1 @@
-export { default } from './analysis-tool';
+export { default } from './analysis-tools';

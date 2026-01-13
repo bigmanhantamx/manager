@@ -25,6 +25,7 @@ import Audio from '../components/audio';
 import BlocklyLoading from '../components/blockly-loading';
 import BotStopped from '../components/bot-stopped';
 import RiskDisclaimer from '../components/risk-disclaimer';
+import RiskCalculatorButton from '../components/risk-calculator-button/risk-calculator-button';
 import BotBuilder from '../pages/bot-builder';
 import Main from '../pages/main';
 import './app.scss';
@@ -221,6 +222,7 @@ const AppContent = observer(() => {
                     <ToastContainer limit={3} draggable={false} />
                     <TncStatusUpdateModal />
                     <RiskDisclaimer />
+                    <RiskCalculatorButton />
                 </div>
             </ThemeProvider>
         </AuthLoadingWrapper>

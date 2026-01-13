@@ -24,12 +24,7 @@ const RiskDisclaimer = () => {
         <>
             {/* Floating Risk Disclaimer Button */}
             <div className='risk-disclaimer-button'>
-                <Button
-                    className='risk-disclaimer-button__btn'
-                    onClick={handleOpenModal}
-                    secondary
-                    small
-                >
+                <Button className='risk-disclaimer-button__btn' onClick={handleOpenModal} secondary small>
                     {localize('Risk Disclaimer')}
                 </Button>
             </div>
@@ -49,28 +44,12 @@ const RiskDisclaimer = () => {
 
                     <Text size='xs' color='general' className='risk-disclaimer-modal__text'>
                         {localize(
-                            'Trading derivatives involves substantial risk of loss and may not be suitable for all investors. Past performance is not indicative of future results. Please ensure you fully understand the risks involved and seek independent advice if necessary.'
-                        )}
-                    </Text>
-
-                    <Text size='xs' color='general' className='risk-disclaimer-modal__text'>
-                        {localize(
-                            'The use of automated trading systems (bots) carries additional risks including but not limited to system failures, connectivity issues, and unexpected market conditions that may result in losses.'
-                        )}
-                    </Text>
-
-                    <Text size='xs' color='general' className='risk-disclaimer-modal__text'>
-                        {localize(
-                            'By using this platform, you acknowledge that you understand these risks and agree to trade at your own discretion and responsibility.'
+                            'Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. Please make sure that you understand the following risks before trading Deriv products: a) you may lose some or all of the money you invest in the trade, b) if your trade involves currency conversion, exchange rates will affect your profit and loss. You should never trade with borrowed money or with money that you cannot afford to lose.'
                         )}
                     </Text>
 
                     <div className='risk-disclaimer-modal__actions'>
-                        <Button
-                            className='risk-disclaimer-modal__understand-btn'
-                            onClick={handleUnderstand}
-                            primary
-                        >
+                        <Button className='risk-disclaimer-modal__understand-btn' onClick={handleUnderstand} primary>
                             {localize('I Understand')}
                         </Button>
                     </div>

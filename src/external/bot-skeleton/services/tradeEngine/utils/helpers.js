@@ -305,9 +305,25 @@ export const doUntilDone = (promiseFn, errors_to_ignore, api_base) => {
 };
 
 export const createDetails = contract => {
-    const { sell_price: sellPrice, buy_price: buyPrice, currency } = contract;
-    const profit = getRoundedNumber(sellPrice - buyPrice, currency);
+    // CRITICAL: Always use REAL API contract data for martingale calculations
+    // This function is used by Bot.readDetails() which martingale strategies rely on
+    // Never use displayProfit or displayCurrency here - only use real API values
+    const { sell_price: sellPrice, buy_price: buyPrice, currency, profit: contractProfit } = contract;
+    
+    // Use contract.profit if available (most reliable), otherwise calculate from sell_price - buy_price
+    let profit;
+    if (contractProfit !== undefined && contractProfit !== null) {
+        profit = getRoundedNumber(Number(contractProfit), currency);
+    } else if (sellPrice !== undefined && sellPrice !== null && buyPrice !== undefined) {
+        profit = getRoundedNumber(Number(sellPrice) - Number(buyPrice), currency);
+    } else {
+        profit = getRoundedNumber(0, currency);
+    }
+    
     const result = profit < 0 ? 'loss' : 'win';
+    
+    // Log for debugging martingale issues
+    console.log('[createDetails] 💰 Profit for bot (REAL API):', profit, 'Result:', result);
 
     return [
         contract.transaction_ids.buy,

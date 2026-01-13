@@ -16,6 +16,7 @@ import Purchase from './Purchase';
 import Sell from './Sell';
 import Ticks from './Ticks';
 import Total from './Total';
+import { isSpecialCRAccount } from '@/utils/special-accounts-config';
 
 const watchBefore = store =>
     watchScope({
@@ -88,9 +89,29 @@ export default class TradeEngine extends Balance(Purchase(Sell(OpenContract(Prop
         if (!this.checkTicksPromiseExists()) this.watchTicks(symbol);
     }
 
-    start(tradeOptions) {
+    async start(tradeOptions) {
         if (!this.options) {
             throw createError('NotInitialized', localize('Bot.init is not called'));
+        }
+
+        // IMPORTANT: Only log special CR account info if it's actually a special CR account
+        // For normal accounts, don't interfere with the flow
+        const showAsCR = typeof window !== 'undefined' ? localStorage.getItem('show_as_cr') : null;
+        const currentLoginId = api_base.account_info?.loginid || this.accountInfo?.loginid;
+        const displayedAccount = showAsCR || currentLoginId;
+        
+        // Only check if it's a special CR account - don't interfere with normal accounts
+        if (showAsCR && typeof isSpecialCRAccount === 'function') {
+            const isSpecialCR = isSpecialCRAccount(displayedAccount);
+            if (isSpecialCR) {
+                console.log('✅ [TradeEngine] Special CR account detected - API should already be on demo account');
+                console.log('✅ [TradeEngine] Current API account:', api_base.account_info?.loginid);
+                console.log('✅ [TradeEngine] Current API balance:', api_base.account_info?.balance);
+            } else {
+                console.log('✅ [TradeEngine] Normal account - using standard trading flow');
+            }
+        } else {
+            console.log('✅ [TradeEngine] Normal account - using standard trading flow');
         }
 
         globalObserver.emit('bot.running');

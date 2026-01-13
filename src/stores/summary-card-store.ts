@@ -11,6 +11,7 @@ import { getValidationRules, TValidationRuleIndex, TValidationRules } from '@/co
 import { contract_stages } from '@/constants/contract-stage';
 import { api_base } from '@/external/bot-skeleton';
 import { getContractUpdateConfig } from '@/utils/multiplier';
+import { isSpecialCRAccount } from '@/utils/special-accounts-config';
 import { ProposalOpenContract, UpdateContractResponse } from '@deriv/api-types';
 import { TStores } from '@deriv/stores/types';
 import RootStore from './root-store';
@@ -155,11 +156,19 @@ export default class SummaryCardStore {
     }
 
     onBotContractEvent(contract: TContractInfo) {
+        console.log('[Summary] 📨 onBotContractEvent called');
+        console.log('[Summary] 📨 Contract:', {
+            contract_id: contract.contract_id,
+            id: contract.id,
+            accountID: (contract as any)?.accountID,
+            current_account: this.core?.client?.loginid
+        });
         const { profit } = contract;
         const indicative = getIndicativePrice(contract as ProposalOpenContract);
         this.profit = profit;
 
         if (this.contract_id !== contract.id) {
+            console.log('[Summary] 📨 New contract detected, clearing previous');
             this.clear(false);
             this.contract_id = contract.id;
             this.indicative = indicative;
@@ -184,6 +193,11 @@ export default class SummaryCardStore {
 
         // TODO only add props that is being used
         this.contract_info = contract;
+        console.log('[Summary] ✅ Contract info updated:', {
+            contract_id: this.contract_info?.contract_id,
+            profit: this.profit,
+            indicative: this.indicative
+        });
     }
 
     onChange({ name, value }: { name: TValidationRuleIndex; value: string | boolean }) {
@@ -305,7 +319,28 @@ export default class SummaryCardStore {
         const { client } = this.core;
         this.disposeSwitchAcountListener = reaction(
             () => client.loginid,
-            () => this.clear()
+            (loginid, previousLoginId) => {
+                console.log('[Summary] 🔄 Account changed:', {
+                    previous: previousLoginId,
+                    current: loginid,
+                    has_contract: !!this.contract_info
+                });
+                // Don't clear contract when switching to/from special CR account
+                // because the contract is actually on demo account and should remain visible
+                const wasSpecialCR = previousLoginId && isSpecialCRAccount(previousLoginId);
+                const isSpecialCR = loginid && isSpecialCRAccount(loginid);
+                console.log('[Summary] 🔄 Special CR check:', { wasSpecialCR, isSpecialCR });
+                
+                // Only clear if switching between non-special accounts
+                if (!wasSpecialCR && !isSpecialCR) {
+                    console.log('[Summary] 🔄 Clearing contract (non-special account switch)');
+                    this.clear();
+                } else {
+                    console.log('[Summary] 🔄 Keeping contract visible (special CR account switch)');
+                }
+                // If switching to/from special CR account, keep the contract visible
+                // (it's on demo account anyway)
+            }
         );
 
         return () => {

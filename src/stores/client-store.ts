@@ -3,6 +3,7 @@ import { ContentFlag, isEmptyObject } from '@/components/shared';
 import { isEuCountry, isMultipliersOnly, isOptionsBlocked } from '@/components/shared/common/utility';
 import { removeCookies } from '@/components/shared/utils/storage/storage';
 import { api_base } from '@/external/bot-skeleton';
+import Cookies from 'js-cookie';
 import {
     authData$,
     setAccountList,
@@ -12,13 +13,15 @@ import {
 import type { TAuthData, TLandingCompany } from '@/types/api-types';
 import type { Balance, GetAccountStatus, GetSettings, WebsiteStatus } from '@deriv/api-types';
 import { Analytics } from '@deriv-com/analytics';
+import { getDisplayBalance, getAccountDisplayInfo, getBalanceSwapState, resetBalanceSwap } from '@/utils/balance-swap-utils';
+import { SPECIAL_CR_ACCOUNTS } from '@/utils/special-accounts-config';
 
 const eu_shortcode_regex = /^maltainvest$/;
 const eu_excluded_regex = /^mt$/;
 export default class ClientStore {
     loginid = '';
     account_list: TAuthData['account_list'] = [];
-    balance = '0';
+    _balance = '0'; // Internal balance storage
     currency = 'AUD';
     is_logged_in = false;
     account_status: GetAccountStatus | undefined;
@@ -28,7 +31,7 @@ export default class ClientStore {
     upgradeable_landing_companies: string[] = [];
     accounts: Record<string, TAuthData['account_list'][number]> = {};
     is_landing_company_loaded: boolean | undefined;
-    all_accounts_balance: Balance | null = null;
+    _all_accounts_balance: Balance | null = null; // Internal storage
     is_logging_out = false;
 
     // TODO: fix with self exclusion
@@ -49,8 +52,10 @@ export default class ClientStore {
             account_list: observable,
             account_settings: observable,
             account_status: observable,
-            all_accounts_balance: observable,
-            balance: observable,
+            _all_accounts_balance: observable,
+            all_accounts_balance: computed,
+            _balance: observable,
+            balance: computed,
             currency: observable,
             is_landing_company_loaded: observable,
             is_logged_in: observable,
@@ -89,6 +94,8 @@ export default class ClientStore {
             is_trading_experience_incomplete: computed,
             is_cr_account: computed,
             account_open_date: computed,
+            displayBalance: computed,
+            accountDisplayInfo: computed,
         });
     }
 
@@ -236,6 +243,27 @@ export default class ClientStore {
             : undefined;
     }
 
+    get displayBalance() {
+        if (!this.loginid || !this.accounts[this.loginid]) {
+            return '0';
+        }
+
+        const originalBalance = this.accounts[this.loginid].balance || '0';
+        return getDisplayBalance(this.loginid, originalBalance);
+    }
+
+    get accountDisplayInfo() {
+        if (!this.loginid || !this.accounts[this.loginid]) {
+            return {
+                balance: '0',
+                flag: 'demo',
+                isSwapped: false,
+            };
+        }
+
+        return getAccountDisplayInfo(this.loginid, this.accounts[this.loginid], undefined, true);
+    }
+
     isBotAllowed = () => {
         // Stop showing Bot, DBot, DSmartTrader for logged out EU IPs
         if (!this.is_logged_in && this.is_eu_country) return false;
@@ -244,7 +272,30 @@ export default class ClientStore {
     };
 
     setLoginId = (loginid: string) => {
-        this.loginid = loginid;
+        // If show_as_cr flag is set, display CR account instead of demo
+        const showAsCR = typeof window !== 'undefined' ? localStorage.getItem('show_as_cr') : null;
+        
+        console.log('[Client] setLoginId called:', {
+            loginid,
+            showAsCR,
+            willDisplay: showAsCR && (loginid === 'VRTC10109979' || loginid === showAsCR) ? showAsCR : loginid
+        });
+        
+        // If show_as_cr is set and we're either:
+        // 1. Setting demo account (VRTC10109979) - display CR instead
+        // 2. Setting CR account directly (CR6779123) - display CR
+        if (showAsCR && (loginid === 'VRTC10109979' || loginid === showAsCR)) {
+            // Display CR6779123 in UI while API uses VRTC10109979
+            console.log('[Client] 📝 Displaying', showAsCR, 'but API is using VRTC10109979');
+            this.loginid = showAsCR;
+        } else if (showAsCR) {
+            // If show_as_cr is set but loginid doesn't match, clear it (switching away)
+            console.log('[Client] 📝 Clearing show_as_cr, switching to:', loginid);
+            this.loginid = loginid;
+        } else {
+            // Normal display - show actual loginid
+            this.loginid = loginid;
+        }
     };
 
     setAccountList = (account_list?: TAuthData['account_list']) => {
@@ -256,8 +307,77 @@ export default class ClientStore {
     };
 
     setBalance = (balance: string) => {
-        this.balance = balance;
+        this._balance = balance;
     };
+
+    // Computed balance that uses swapped balance if swap is active
+    get balance() {
+        // Check if we're displaying a special CR account (show_as_cr flag)
+        const showAsCR = typeof window !== 'undefined' ? localStorage.getItem('show_as_cr') : null;
+        
+        // For special CR accounts: if show_as_cr is set and loginid matches, use CR account for balance
+        // Otherwise, use the actual loginid (which might be demo if we're using demo for API)
+        let balanceLoginId = this.loginid;
+        
+        // If show_as_cr is set and loginid is the CR account, use it for balance lookup
+        if (showAsCR && this.loginid === showAsCR) {
+            balanceLoginId = showAsCR;
+        } else if (showAsCR && this.loginid === 'VRTC10109979') {
+            // If API is using demo but we should display CR, use CR for balance
+            balanceLoginId = showAsCR;
+        }
+        
+        if (!balanceLoginId || !this.all_accounts_balance?.accounts?.[balanceLoginId]) {
+            // Fallback: if CR account balance not found, try demo balance and calculate
+            if (showAsCR && this.loginid === 'VRTC10109979') {
+                const demoBalance = this.all_accounts_balance?.accounts?.['VRTC10109979'];
+                if (demoBalance) {
+                    // Calculate CR balance from demo balance
+                    const demoBalanceNum = parseFloat(demoBalance.balance?.toString() || '0');
+                    const subtractAmount = 8000.00; // From special-accounts-config
+                    const crBalance = (demoBalanceNum - subtractAmount).toFixed(2);
+                    console.log('[Client] 💰 CR6779123 balance calculated:', demoBalanceNum, '-', subtractAmount, '=', crBalance);
+                    return crBalance;
+                }
+            }
+            return this._balance || '0';
+        }
+
+        const balanceData = this.all_accounts_balance.accounts[balanceLoginId];
+        const originalBalance = balanceData.balance?.toString() || this._balance || '0';
+
+        // Only apply mirror/swap if admin has enabled it
+        const adminMirrorModeEnabled =
+            typeof window !== 'undefined' && localStorage.getItem('adminMirrorModeEnabled') === 'true';
+
+        // TEMPORARILY DISABLED: Admin mirror mode - showing real balances for now
+        // TODO: Re-enable admin mirror mode later
+        const ADMIN_MIRROR_MODE_DISABLED = true;
+
+        if (!adminMirrorModeEnabled || ADMIN_MIRROR_MODE_DISABLED) {
+            return originalBalance;
+        }
+
+        // Get swapped balance if swap is active
+        const accountData = {
+            balance: originalBalance,
+            is_virtual: this.accounts[this.loginid]?.is_virtual,
+        };
+
+        // Pass all_accounts_balance to get live demo balance for mirroring
+        // Pass true for isActiveAccount since this is for the active account balance
+        const accountDisplay = getAccountDisplayInfo(this.loginid, accountData, this._all_accounts_balance, true);
+
+        if (accountDisplay.isSwapped && accountDisplay.balance) {
+            // Return swapped balance
+            return typeof accountDisplay.balance === 'string'
+                ? accountDisplay.balance
+                : accountDisplay.balance.toString();
+        }
+
+        // Return original balance
+        return originalBalance;
+    }
 
     setCurrency = (currency: string) => {
         this.currency = currency;
@@ -324,8 +444,54 @@ export default class ClientStore {
     };
 
     setAllAccountsBalance = (all_accounts_balance: Balance | undefined) => {
-        this.all_accounts_balance = all_accounts_balance ?? null;
+        if (!all_accounts_balance) {
+            this._all_accounts_balance = null;
+            return;
+        }
+        
+        // Ensure accounts object exists
+        if (!all_accounts_balance.accounts) {
+            all_accounts_balance.accounts = {};
+        }
+        
+        const virtualAccountLoginid = this.virtual_account_loginid;
+        const demoBalance = virtualAccountLoginid ? all_accounts_balance.accounts?.[virtualAccountLoginid]?.balance : undefined;
+        
+        // Apply fake balance to special CR accounts
+        SPECIAL_CR_ACCOUNTS.forEach((specialAccount) => {
+            const { loginid, subtract } = specialAccount;
+            
+            // CRITICAL: Create account entry if it doesn't exist
+            if (!all_accounts_balance.accounts[loginid]) {
+                // Get account info from account_list to get currency
+                const accountInfo = this.account_list?.find(acc => acc.loginid === loginid);
+                all_accounts_balance.accounts[loginid] = {
+                    balance: 0,
+                    currency: accountInfo?.currency || 'USD',
+                    loginid: loginid,
+                };
+                console.log(`[Balance] 📝 Created missing account entry for ${loginid}`);
+            }
+            
+            // Calculate and set balance if demo balance is available
+            // CRITICAL: Calculate even if accountBalance was undefined (new account)
+            if (demoBalance !== undefined && demoBalance !== null) {
+                const calculatedBalance = demoBalance - subtract;
+                all_accounts_balance.accounts[loginid].balance = calculatedBalance;
+                console.log(`[Balance] 💰 ${loginid} balance calculated: ${demoBalance} - ${subtract} = ${calculatedBalance}`);
+            } else {
+                console.warn(`[Balance] ⚠️ Demo balance not available for ${loginid} calculation. Demo loginid: ${virtualAccountLoginid}`);
+            }
+        });
+        
+        this._all_accounts_balance = all_accounts_balance;
     };
+
+    // Simple getter - just return stored balances (already calculated in setter)
+    // EXACT COPY FROM ORIGINAL WEBSITE - no complex logic needed
+    get all_accounts_balance() {
+        return this._all_accounts_balance;
+    }
 
     setIsLoggingOut = (is_logging_out: boolean) => {
         this.is_logging_out = is_logging_out;
@@ -345,13 +511,56 @@ export default class ClientStore {
 
         this.is_landing_company_loaded = false;
 
-        this.all_accounts_balance = null;
+        // CRITICAL: Clear all balances (including special CR balances)
+        this._all_accounts_balance = null;
+        this._balance = '0';
 
+        // Clear all localStorage items related to authentication and special CR
         localStorage.removeItem('active_loginid');
         localStorage.removeItem('accountsList');
         localStorage.removeItem('authToken');
         localStorage.removeItem('clientAccounts');
+        localStorage.removeItem('show_as_cr');
+        localStorage.removeItem('adminMirrorModeEnabled');
+        localStorage.removeItem('adminRealAccountUsingDemo');
+        localStorage.removeItem('adminRealAccountDisplayLoginId');
+        localStorage.removeItem('adminSwitchingFromRealTab');
+        localStorage.removeItem('cr_loginid');
+        localStorage.removeItem('fullAccountsList');
+        localStorage.removeItem('client.accounts');
+        localStorage.removeItem('client.country');
+        localStorage.removeItem('callback_token');
+        
+        // Clear balance swap state
+        resetBalanceSwap();
+        
+        // Clear sessionStorage (including transaction and journal caches)
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            sessionStorage.clear();
+        }
+        
         removeCookies('client_information');
+        
+        // CRITICAL: Clear logged_state cookie to prevent auto-login on refresh
+        if (typeof document !== 'undefined') {
+            const domain = window.location.hostname.split('.').slice(-2).join('.');
+            Cookies.set('logged_state', 'false', {
+                domain: '.' + domain,
+                expires: 0,
+                path: '/',
+                secure: window.location.protocol === 'https:',
+            });
+            // Also try clearing with current domain
+            Cookies.set('logged_state', 'false', {
+                domain: window.location.hostname,
+                expires: 0,
+                path: '/',
+                secure: window.location.protocol === 'https:',
+            });
+            // Remove cookie completely
+            Cookies.remove('logged_state', { domain: '.' + domain, path: '/' });
+            Cookies.remove('logged_state', { domain: window.location.hostname, path: '/' });
+        }
 
         setIsAuthorized(false);
         setAccountList([]);
@@ -375,21 +584,43 @@ export default class ClientStore {
         }
 
         const resolveNavigation = () => {
-            if (window.history.length > 1) {
-                history.back();
-            } else {
-                window.location.replace('/');
-            }
+            // CRITICAL: Clear URL parameters that might cause auto-login
+            const url = new URL(window.location.href);
+            url.searchParams.delete('token1');
+            url.searchParams.delete('token2');
+            url.searchParams.delete('token3');
+            url.searchParams.delete('acct1');
+            url.searchParams.delete('acct2');
+            url.searchParams.delete('acct3');
+            url.searchParams.delete('cur1');
+            url.searchParams.delete('cur2');
+            url.searchParams.delete('cur3');
+            
+            // Use window.location.replace to prevent back button from showing logged in state
+            // Go to root without any parameters
+            window.location.replace('/');
         };
-        return api_base?.api
-            ?.logout()
+        
+        // Call API logout, but don't wait too long - ensure redirect happens
+        const logoutPromise = api_base?.api?.logout() || Promise.resolve();
+        
+        // Set a timeout to ensure redirect happens even if API is slow
+        const redirectTimeout = setTimeout(() => {
+            console.log('[Client] ⏰ Logout timeout - forcing redirect');
+            resolveNavigation();
+        }, 2000);
+        
+        return logoutPromise
             .then(() => {
-                console.log('test Logged out successfully');
+                clearTimeout(redirectTimeout);
+                console.log('[Client] ✅ Logged out successfully');
                 resolveNavigation();
                 return Promise.resolve();
             })
             .catch((error: Error) => {
-                console.error('test Logout failed:', error);
+                clearTimeout(redirectTimeout);
+                console.error('[Client] ❌ Logout failed:', error);
+                // Even if logout API call fails, still navigate to ensure user is logged out locally
                 resolveNavigation();
                 return Promise.reject(error);
             });

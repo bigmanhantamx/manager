@@ -57,25 +57,73 @@ export const useOauth2 = ({
 
     const logoutHandler = async () => {
         client?.setIsLoggingOut(true);
-        try {
-            await OAuth2Logout({
-                redirectCallbackUri: `${window.location.origin}/callback`,
-                WSLogoutAndRedirect: handleLogout ?? (() => Promise.resolve()),
-                postLogoutRedirectUri: window.location.origin,
-            }).catch(err => {
-                // eslint-disable-next-line no-console
-                console.error(err);
-            });
-            await client?.logout().catch(err => {
-                // eslint-disable-next-line no-console
-                console.error('Error during TMB logout:', err);
-            });
-
-            Analytics.reset();
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error(error);
+        
+        // CRITICAL: Clear all data FIRST, then redirect immediately
+        // Don't wait for async operations - just clear and redirect
+        
+        // Clear logged_state cookie to prevent auto-login
+        const domain = window.location.hostname.split('.').slice(-2).join('.');
+        Cookies.set('logged_state', 'false', {
+            domain: '.' + domain,
+            expires: 0,
+            path: '/',
+            secure: window.location.protocol === 'https:',
+        });
+        Cookies.set('logged_state', 'false', {
+            domain: window.location.hostname,
+            expires: 0,
+            path: '/',
+            secure: window.location.protocol === 'https:',
+        });
+        Cookies.remove('logged_state', { domain: '.' + domain, path: '/' });
+        Cookies.remove('logged_state', { domain: window.location.hostname, path: '/' });
+        
+        // Clear all localStorage
+        localStorage.removeItem('active_loginid');
+        localStorage.removeItem('accountsList');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('clientAccounts');
+        localStorage.removeItem('show_as_cr');
+        localStorage.removeItem('adminMirrorModeEnabled');
+        localStorage.removeItem('adminRealAccountUsingDemo');
+        localStorage.removeItem('adminRealAccountDisplayLoginId');
+        localStorage.removeItem('adminSwitchingFromRealTab');
+        localStorage.removeItem('cr_loginid');
+        localStorage.removeItem('fullAccountsList');
+        localStorage.removeItem('client.accounts');
+        localStorage.removeItem('client.country');
+        localStorage.removeItem('callback_token');
+        
+        // Clear sessionStorage
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            sessionStorage.clear();
         }
+        
+        Analytics.reset();
+        
+        // Clear client state
+        if (client) {
+            client.account_list = [];
+            client.accounts = {};
+            client.is_logged_in = false;
+            client.loginid = '';
+            client.balance = '0';
+            client.currency = 'USD';
+            client._all_accounts_balance = null;
+        }
+        
+        // Call OAuth2Logout and client.logout in background (don't wait)
+        // But redirect immediately
+        OAuth2Logout({
+            redirectCallbackUri: `${window.location.origin}/callback`,
+            WSLogoutAndRedirect: handleLogout ?? (() => Promise.resolve()),
+            postLogoutRedirectUri: window.location.origin,
+        }).catch(() => {});
+        
+        client?.logout().catch(() => {});
+        
+        // CRITICAL: Force immediate redirect - don't wait for anything
+        window.location.replace('/');
     };
     const retriggerOAuth2Login = async () => {
         try {

@@ -1,7 +1,15 @@
 import { config } from '../../../constants/config';
 import { observer as globalObserver } from '../../../utils/observer';
 
-export const contract = c => globalObserver.emit('bot.contract', c);
+export const contract = c => {
+    console.log('[Broadcast] 📢 Emitting bot.contract event:', {
+        contract_id: c.contract_id,
+        accountID: c.accountID,
+        is_sold: c.is_sold
+    });
+    globalObserver.emit('bot.contract', c);
+    console.log('[Broadcast] ✅ bot.contract event emitted');
+};
 
 export const contractStatus = c => globalObserver.emit('contract.status', c);
 
