@@ -18,21 +18,37 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      
       - name: Fetch site configurations from Appwrite
         id: set-matrix
         run: |
           # Fetch all site configs from Appwrite database
-          CONFIGS=$(curl -X GET \
+          CONFIGS=$(curl -s -X GET \
             "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents" \
             -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
             -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
             -H "Content-Type: application/json")
           
+          echo "Raw API Response:"
+          echo "$CONFIGS" | jq '.' || echo "$CONFIGS"
+          
+          # Check if we got documents
+          DOC_COUNT=$(echo "$CONFIGS" | jq -r '.documents | length' || echo "0")
+          echo "Found $DOC_COUNT site configurations"
+          
+          if [ "$DOC_COUNT" -eq "0" ]; then
+            echo "⚠️ No site configurations found in database"
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           # Extract documents and format for matrix
-          MATRIX=$(echo "$CONFIGS" | jq -c '{include: [.documents[] | {siteId: .siteId, siteName: .siteName, appId: .appId, primaryColor: .primaryColor, secondaryColor: .secondaryColor, domain: .domain}]}')
+          MATRIX=$(echo "$CONFIGS" | jq -c '{include: [.documents[] | {siteId: .siteId, siteName: .siteName, appId: .appId, primaryColor: .primaryColor, secondaryColor: .secondaryColor, domain: (.domain // "")}]}')
           
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-          echo "Found sites to deploy:"
+          echo "Matrix for deployment:"
           echo "$MATRIX" | jq '.'
 
   build-and-deploy:
@@ -80,46 +96,73 @@ jobs:
           echo "🚀 App ID: ${{ matrix.appId }}"
           echo "🎨 Colors: ${{ matrix.primaryColor }} / ${{ matrix.secondaryColor }}"
 
+      - name: Install jq and zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq zip
+      
       - name: Deploy to Appwrite Hosting - ${{ matrix.siteName }}
         if: env.APPWRITE_SITE_ID != ''
         run: |
           echo "🚀 Deploying ${{ matrix.siteName }} to Appwrite Hosting..."
           echo "📋 Site ID: ${{ env.APPWRITE_SITE_ID }}"
           
+          # Check if dist directory exists
+          if [ ! -d "dist" ]; then
+            echo "❌ Error: dist directory not found!"
+            exit 1
+          fi
+          
           # Create a zip file of the dist directory
           cd dist
           zip -r ../site-build.zip . -q
           cd ..
           
-          echo "📦 Created deployment archive"
+          # Check if zip was created
+          if [ ! -f "site-build.zip" ]; then
+            echo "❌ Error: Failed to create zip file!"
+            exit 1
+          fi
+          
+          echo "📦 Created deployment archive ($(du -h site-build.zip | cut -f1))"
           
           # Deploy using Appwrite Hosting API
-          DEPLOY_RESPONSE=$(curl -s -X POST \
+          echo "📤 Uploading to Appwrite Hosting..."
+          DEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments" \
             -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
             -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
             -F "entrypoint=index.html" \
             -F "code=@site-build.zip")
           
+          HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
+          DEPLOY_BODY=$(echo "$DEPLOY_RESPONSE" | sed '$d')
+          
+          echo "📤 HTTP Status: $HTTP_CODE"
           echo "📤 Deployment API Response:"
-          echo "$DEPLOY_RESPONSE" | jq '.' || echo "$DEPLOY_RESPONSE"
+          echo "$DEPLOY_BODY" | jq '.' 2>/dev/null || echo "$DEPLOY_BODY"
           
           # Check if deployment was successful
-          DEPLOYMENT_ID=$(echo "$DEPLOY_RESPONSE" | jq -r '.["$id"] // .id // empty' || echo "")
-          
-          if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ]; then
-            echo "✅ Deployment created successfully! Deployment ID: $DEPLOYMENT_ID"
+          if [ "$HTTP_CODE" -eq "201" ] || [ "$HTTP_CODE" -eq "200" ]; then
+            DEPLOYMENT_ID=$(echo "$DEPLOY_BODY" | jq -r '.["$id"] // .id // empty' 2>/dev/null || echo "")
             
-            # Update status in database
-            curl -s -X PUT \
-              "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
-              -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
-              -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"status\": \"deployed\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update status"
+            if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ]; then
+              echo "✅ Deployment created successfully! Deployment ID: $DEPLOYMENT_ID"
+              
+              # Update status in database
+              curl -s -X PUT \
+                "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
+                -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+                -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"status\": \"deployed\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update status"
+            else
+              echo "⚠️ Deployment response received but could not extract deployment ID"
+            fi
           else
-            echo "⚠️ Deployment may have failed. Check the response above."
-            echo "⚠️ You may need to deploy manually via Appwrite Console"
+            echo "❌ Deployment failed with HTTP $HTTP_CODE"
+            echo "Response: $DEPLOY_BODY"
+            exit 1
           fi
           
           # Cleanup
