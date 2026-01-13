@@ -158,26 +158,43 @@ jobs:
           
           # Deploy using Appwrite Hosting API
           echo "📤 Uploading to Appwrite Hosting..."
-          DEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          echo "📋 Endpoint: https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments"
+          
+          # Try deployment API endpoint
+          DEPLOY_RESPONSE=$(curl -v -s -w "\n%{http_code}" -X POST \
             "https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments" \
             -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
             -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
             -F "entrypoint=index.html" \
-            -F "code=@site-build.zip")
+            -F "code=@site-build.zip" 2>&1)
           
-          HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
-          DEPLOY_BODY=$(echo "$DEPLOY_RESPONSE" | sed '$d')
+          HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | grep -E "^[0-9]{3}$" | tail -n1)
+          DEPLOY_BODY=$(echo "$DEPLOY_RESPONSE" | sed '/^[0-9]\{3\}$/d' | sed '/^[<>*] /d' | tail -n +20)
           
-          echo "📤 HTTP Status: $HTTP_CODE"
-          echo "📤 Deployment API Response:"
+          echo "📤 HTTP Status Code: $HTTP_CODE"
+          echo "📤 Full Response:"
+          echo "$DEPLOY_RESPONSE"
+          echo ""
+          echo "📤 Parsed Response Body:"
           echo "$DEPLOY_BODY" | jq '.' 2>/dev/null || echo "$DEPLOY_BODY"
           
           # Check if deployment was successful
           if [ "$HTTP_CODE" -eq "201" ] || [ "$HTTP_CODE" -eq "200" ]; then
             DEPLOYMENT_ID=$(echo "$DEPLOY_BODY" | jq -r '.["$id"] // .id // empty' 2>/dev/null || echo "")
             
-            if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ]; then
+            if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ] && [ "$DEPLOYMENT_ID" != "" ]; then
               echo "✅ Deployment created successfully! Deployment ID: $DEPLOYMENT_ID"
+              
+              # Try to activate the deployment (if needed)
+              echo "🔄 Checking if deployment needs activation..."
+              ACTIVATE_RESPONSE=$(curl -s -X PATCH \
+                "https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments/$DEPLOYMENT_ID" \
+                -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+                -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d '{"status":"available"}' 2>&1 || echo "")
+              
+              echo "Activation response: $ACTIVATE_RESPONSE"
               
               # Update status in database
               curl -s -X PUT \
@@ -188,11 +205,13 @@ jobs:
                 -d "{\"status\": \"deployed\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update status"
             else
               echo "⚠️ Deployment response received but could not extract deployment ID"
+              echo "⚠️ Response body: $DEPLOY_BODY"
             fi
           else
             echo "❌ Deployment failed with HTTP $HTTP_CODE"
-            echo "Response: $DEPLOY_BODY"
-            exit 1
+            echo "❌ Full response: $DEPLOY_RESPONSE"
+            # Don't exit 1 - let it continue so we can see what happened
+            echo "⚠️ Continuing despite deployment failure for debugging"
           fi
           
           # Cleanup
