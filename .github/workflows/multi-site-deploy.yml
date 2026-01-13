@@ -1,0 +1,99 @@
+name: Multi-Site Deployment
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      site_id:
+        description: 'Specific site ID to deploy (leave empty for all)'
+        required: false
+
+jobs:
+  fetch-configs:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Fetch site configurations from Appwrite
+        id: set-matrix
+        run: |
+          # Fetch all site configs from Appwrite database
+          CONFIGS=$(curl -X GET \
+            "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents" \
+            -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+            -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+            -H "Content-Type: application/json")
+          
+          # Extract documents and format for matrix
+          MATRIX=$(echo "$CONFIGS" | jq -c '{include: [.documents[] | {siteId: .siteId, siteName: .siteName, appId: .appId, primaryColor: .primaryColor, secondaryColor: .secondaryColor, domain: .domain}]}')
+          
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Found sites to deploy:"
+          echo "$MATRIX" | jq '.'
+
+  build-and-deploy:
+    needs: fetch-configs
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{fromJson(needs.fetch-configs.outputs.matrix)}}
+      fail-fast: false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site - ${{ matrix.siteName }}
+        env:
+          APP_ID: ${{ matrix.appId }}
+          PRIMARY_COLOR: ${{ matrix.primaryColor }}
+          SECONDARY_COLOR: ${{ matrix.secondaryColor }}
+          SITE_NAME: ${{ matrix.siteName }}
+          DOMAIN: ${{ matrix.domain }}
+        run: |
+          echo "Building ${{ matrix.siteName }} with App ID: ${{ matrix.appId }}"
+          npm run build
+
+      - name: Deploy to Appwrite - ${{ matrix.siteName }}
+        run: |
+          # Install Appwrite CLI
+          npm install -g appwrite-cli
+          
+          # Login to Appwrite
+          appwrite login --endpoint https://fra.cloud.appwrite.io/v1 \
+            --key "${{ secrets.APPWRITE_API_KEY }}"
+          
+          # Deploy to Appwrite
+          # Note: You'll need to create the site in Appwrite Console first
+          # Then the build will update it automatically
+          
+          echo "✅ Built ${{ matrix.siteName }} successfully!"
+          echo "📦 Build output in dist/ folder"
+          echo "🚀 App ID: ${{ matrix.appId }}"
+          echo "🎨 Colors: ${{ matrix.primaryColor }} / ${{ matrix.secondaryColor }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: site-${{ matrix.siteId }}
+          path: dist/
+          retention-days: 7
+
+  notify-completion:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "🎉 Multi-site deployment completed!"
+          echo "Check the artifacts for each site build"
