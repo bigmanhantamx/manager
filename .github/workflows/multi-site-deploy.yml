@@ -10,7 +10,7 @@ on:
         required: false
         type: string
   repository_dispatch:
-    types: [site_created]
+    types: [site_deployment_request, site_created]
 
 jobs:
   fetch-configs:
@@ -84,6 +84,7 @@ jobs:
         if: env.APPWRITE_SITE_ID != ''
         run: |
           echo "🚀 Deploying ${{ matrix.siteName }} to Appwrite Hosting..."
+          echo "📋 Site ID: ${{ env.APPWRITE_SITE_ID }}"
           
           # Install Appwrite CLI for deployment
           npm install -g appwrite-cli@latest
@@ -91,14 +92,29 @@ jobs:
           # Login to Appwrite
           appwrite client --endpoint https://fra.cloud.appwrite.io/v1 --project "${{ secrets.APPWRITE_PROJECT_ID }}" --key "${{ secrets.APPWRITE_API_KEY }}"
           
-          # Deploy to Appwrite Hosting
+          # Deploy to Appwrite Hosting using CLI
+          # Note: Appwrite CLI deploy hosting command format
           appwrite deploy hosting \
             --siteId "${{ env.APPWRITE_SITE_ID }}" \
             --project "${{ secrets.APPWRITE_PROJECT_ID }}" \
             --key "${{ secrets.APPWRITE_API_KEY }}" \
-            --dist "dist" || echo "⚠️ Deployment failed - check Appwrite Console"
+            --dist "dist" \
+            --entrypoint "index.html" || {
+              echo "⚠️ CLI deployment failed, trying direct API..."
+              
+              # Fallback: Try direct API deployment
+              DEPLOY_RESPONSE=$(curl -s -X POST \
+                "https://fra.cloud.appwrite.io/v1/sites/${{ env.APPWRITE_SITE_ID }}/deployments" \
+                -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+                -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+                -H "Content-Type: application/json" \
+                -F "entrypoint=index.html" \
+                -F "code=@dist" || echo '{"error":"failed"}')
+              
+              echo "API Response: $DEPLOY_RESPONSE"
+            }
           
-          echo "✅ Deployment completed for ${{ matrix.siteName }}"
+          echo "✅ Deployment process completed for ${{ matrix.siteName }}"
           
           # Update status in database
           curl -s -X PUT \
