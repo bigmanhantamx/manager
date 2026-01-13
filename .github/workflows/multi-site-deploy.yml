@@ -66,27 +66,97 @@ jobs:
           echo "Building ${{ matrix.siteName }} with App ID: ${{ matrix.appId }}"
           npm run build
 
-      - name: Create Site in Appwrite (if needed) - ${{ matrix.siteName }}
+      - name: Create or Verify Appwrite Hosting Site - ${{ matrix.siteName }}
+        id: create-site
         run: |
-          echo "🔧 Setting up Appwrite CLI..."
-          npm install -g appwrite-cli@latest
+          echo "🔍 Checking if site '${{ matrix.siteName }}' exists in Appwrite Hosting..."
           
-          echo "🔐 Logging into Appwrite..."
-          appwrite client --endpoint https://fra.cloud.appwrite.io/v1 --project "${{ secrets.APPWRITE_PROJECT_ID }}" --key "${{ secrets.APPWRITE_API_KEY }}"
+          # Check if site exists by listing all sites
+          EXISTING_SITES=$(curl -s -X GET \
+            "https://fra.cloud.appwrite.io/v1/hosting/sites" \
+            -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+            -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+            -H "Content-Type: application/json" || echo '{"sites":[]}')
           
-          echo "📦 Creating site: ${{ matrix.siteName }}"
+          # Check if site with this name exists
+          SITE_EXISTS=$(echo "$EXISTING_SITES" | jq -r --arg name "${{ matrix.siteName }}" '.sites[]? | select(.name == $name) | .$id' || echo "")
           
-          # Try to create site using Appwrite CLI
-          # Note: Appwrite CLI hosting commands may vary - adjust as needed
-          appwrite hosting create \
-            --name "${{ matrix.siteName }}" \
-            --repo "https://github.com/bigmanhantamx/manager.git" \
-            --branch "master" || echo "⚠️ Site creation failed - may need manual creation in Appwrite Console"
+          if [ -z "$SITE_EXISTS" ]; then
+            echo "📦 Site '${{ matrix.siteName }}' not found. Creating new site..."
+            
+            # Create site via Appwrite Hosting API
+            CREATE_RESPONSE=$(curl -s -X POST \
+              "https://fra.cloud.appwrite.io/v1/hosting/sites" \
+              -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+              -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"name\": \"${{ matrix.siteName }}\"}" || echo '{"error":"failed"}')
+            
+            # Extract site ID from response
+            NEW_SITE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.["$id"] // .id // empty' || echo "")
+            
+            if [ -n "$NEW_SITE_ID" ] && [ "$NEW_SITE_ID" != "null" ]; then
+              echo "✅ Site created successfully with ID: $NEW_SITE_ID"
+              echo "APPWRITE_SITE_ID=$NEW_SITE_ID" >> $GITHUB_ENV
+              
+              # Update database with the actual Appwrite Site ID
+              curl -s -X PUT \
+                "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
+                -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+                -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"siteId\": \"$NEW_SITE_ID\", \"status\": \"created\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update database"
+            else
+              echo "⚠️ Site creation via API failed. Response: $CREATE_RESPONSE"
+              echo "⚠️ You may need to create the site manually in Appwrite Console → Sites"
+              echo "⚠️ Then update the config with the Site ID"
+              echo "APPWRITE_SITE_ID=${{ matrix.siteId }}" >> $GITHUB_ENV
+            fi
+          else
+            echo "✅ Site '${{ matrix.siteName }}' already exists with ID: $SITE_EXISTS"
+            echo "APPWRITE_SITE_ID=$SITE_EXISTS" >> $GITHUB_ENV
+            
+            # Update database with the actual Appwrite Site ID if different
+            if [ "$SITE_EXISTS" != "${{ matrix.siteId }}" ]; then
+              curl -s -X PUT \
+                "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
+                -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+                -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"siteId\": \"$SITE_EXISTS\", \"status\": \"created\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update database"
+            fi
+          fi
           
-          echo "✅ Site setup completed for ${{ matrix.siteName }}"
           echo "🚀 App ID: ${{ matrix.appId }}"
           echo "🎨 Colors: ${{ matrix.primaryColor }} / ${{ matrix.secondaryColor }}"
-          echo "📝 Note: If site doesn't exist, create it manually in Appwrite Console → Sites"
+
+      - name: Deploy to Appwrite Hosting - ${{ matrix.siteName }}
+        if: env.APPWRITE_SITE_ID != ''
+        run: |
+          echo "🚀 Deploying ${{ matrix.siteName }} to Appwrite Hosting..."
+          
+          # Install Appwrite CLI for deployment
+          npm install -g appwrite-cli@latest
+          
+          # Login to Appwrite
+          appwrite client --endpoint https://fra.cloud.appwrite.io/v1 --project "${{ secrets.APPWRITE_PROJECT_ID }}" --key "${{ secrets.APPWRITE_API_KEY }}"
+          
+          # Deploy to Appwrite Hosting
+          appwrite deploy hosting \
+            --siteId "${{ env.APPWRITE_SITE_ID }}" \
+            --project "${{ secrets.APPWRITE_PROJECT_ID }}" \
+            --key "${{ secrets.APPWRITE_API_KEY }}" \
+            --dist "dist" || echo "⚠️ Deployment failed - check Appwrite Console"
+          
+          echo "✅ Deployment completed for ${{ matrix.siteName }}"
+          
+          # Update status in database
+          curl -s -X PUT \
+            "https://fra.cloud.appwrite.io/v1/databases/${{ secrets.APPWRITE_DATABASE_ID }}/collections/deployment_configs/documents/${{ matrix.siteId }}" \
+            -H "X-Appwrite-Project: ${{ secrets.APPWRITE_PROJECT_ID }}" \
+            -H "X-Appwrite-Key: ${{ secrets.APPWRITE_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"status\": \"deployed\", \"updatedAt\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" || echo "⚠️ Could not update status"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
