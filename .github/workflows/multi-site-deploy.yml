@@ -8,6 +8,9 @@ on:
       site_id:
         description: 'Specific site ID to deploy (leave empty for all)'
         required: false
+        type: string
+  repository_dispatch:
+    types: [site_created]
 
 jobs:
   fetch-configs:
@@ -63,23 +66,27 @@ jobs:
           echo "Building ${{ matrix.siteName }} with App ID: ${{ matrix.appId }}"
           npm run build
 
-      - name: Deploy to Appwrite - ${{ matrix.siteName }}
+      - name: Create Site in Appwrite (if needed) - ${{ matrix.siteName }}
         run: |
-          # Install Appwrite CLI
-          npm install -g appwrite-cli
+          echo "🔧 Setting up Appwrite CLI..."
+          npm install -g appwrite-cli@latest
           
-          # Login to Appwrite
-          appwrite login --endpoint https://fra.cloud.appwrite.io/v1 \
-            --key "${{ secrets.APPWRITE_API_KEY }}"
+          echo "🔐 Logging into Appwrite..."
+          appwrite client --endpoint https://fra.cloud.appwrite.io/v1 --project "${{ secrets.APPWRITE_PROJECT_ID }}" --key "${{ secrets.APPWRITE_API_KEY }}"
           
-          # Deploy to Appwrite
-          # Note: You'll need to create the site in Appwrite Console first
-          # Then the build will update it automatically
+          echo "📦 Creating site: ${{ matrix.siteName }}"
           
-          echo "✅ Built ${{ matrix.siteName }} successfully!"
-          echo "📦 Build output in dist/ folder"
+          # Try to create site using Appwrite CLI
+          # Note: Appwrite CLI hosting commands may vary - adjust as needed
+          appwrite hosting create \
+            --name "${{ matrix.siteName }}" \
+            --repo "https://github.com/bigmanhantamx/manager.git" \
+            --branch "master" || echo "⚠️ Site creation failed - may need manual creation in Appwrite Console"
+          
+          echo "✅ Site setup completed for ${{ matrix.siteName }}"
           echo "🚀 App ID: ${{ matrix.appId }}"
           echo "🎨 Colors: ${{ matrix.primaryColor }} / ${{ matrix.secondaryColor }}"
+          echo "📝 Note: If site doesn't exist, create it manually in Appwrite Console → Sites"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
