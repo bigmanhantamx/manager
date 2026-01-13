@@ -82,6 +82,8 @@ jobs:
   build-and-deploy:
     needs: fetch-configs
     runs-on: ubuntu-latest
+    # Skip if no sites to deploy
+    if: needs.fetch-configs.outputs.matrix != '{"include":[]}' && needs.fetch-configs.outputs.matrix != ''
     strategy:
       matrix: ${{fromJson(needs.fetch-configs.outputs.matrix)}}
       fail-fast: false
